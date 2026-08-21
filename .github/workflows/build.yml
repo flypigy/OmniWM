@@ -25,17 +25,21 @@ jobs:
       - name: Select Xcode with Swift 6.4+
         run: |
           set -euo pipefail
-          ls -d /Applications/Xcode*.app || true
+          selected=""
           for xc in /Applications/Xcode*.app; do
-            v="$("$xc/Contents/Developer/usr/bin/swift" --version 2>/dev/null | head -1 || true)"
-            echo "$xc -> $v"
+            dd="$xc/Contents/Developer"
+            [ -x "$dd/usr/bin/swift" ] || continue
+            v="$(DEVELOPER_DIR="$dd" xcrun swift --version 2>/dev/null | head -1 || true)"
+            echo "$xc -> ${v:-unavailable}"
             if echo "$v" | grep -qE "Swift version 6\.[4-9]|Swift version [7-9]"; then
-              echo "Selecting $xc"
-              sudo xcode-select -s "$xc/Contents/Developer"
+              selected="$dd"
               break
             fi
           done
-          swift --version
+          if [ -z "$selected" ]; then echo "no Xcode with Swift 6.4+ found"; exit 1; fi
+          echo "Selecting $selected"
+          echo "DEVELOPER_DIR=$selected" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$selected" swift --version
 
       - name: Build and package (ad-hoc signed)
         shell: bash
