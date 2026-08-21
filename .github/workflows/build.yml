@@ -27,7 +27,7 @@ jobs:
           set -euo pipefail
           ls -d /Applications/Xcode*.app || true
           for xc in /Applications/Xcode*.app; do
-            v="$("$xc/Contents/Developer/usr/bin/swift" --version 2>/dev/null | head -1)"
+            v="$("$xc/Contents/Developer/usr/bin/swift" --version 2>/dev/null | head -1 || true)"
             echo "$xc -> $v"
             if echo "$v" | grep -qE "Swift version 6\.[4-9]|Swift version [7-9]"; then
               echo "Selecting $xc"
