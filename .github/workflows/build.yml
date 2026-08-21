@@ -20,30 +20,7 @@ jobs:
       - name: Show toolchain
         run: |
           swift --version
-          xcodebuild -version
-
-      - name: Select Xcode with Swift 6.4+
-        run: |
-          set -euo pipefail
-          echo "=== diagnose one Xcode layout ==="
-          ls /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/ 2>/dev/null | head -20 || true
-          find /Applications/Xcode_26.6.app/Contents/Developer -maxdepth 6 -name swift -type f 2>/dev/null | head -5 || true
-          echo "=== probe toolchains ==="
-          selected=""
-          for xc in /Applications/Xcode*.app; do
-            dd="$xc/Contents/Developer"
-            if [ ! -e "$dd" ]; then echo "$xc -> no Developer dir"; continue; fi
-            v="$(DEVELOPER_DIR="$dd" xcrun swift --version 2>/dev/null | head -1 || true)"
-            echo "$xc -> ${v:-unavailable}"
-            if echo "$v" | grep -qE "Swift version 6\.[4-9]|Swift version [7-9]"; then
-              selected="$dd"
-              break
-            fi
-          done
-          if [ -z "$selected" ]; then echo "no Xcode with Swift 6.4+ found"; exit 1; fi
-          echo "Selecting $selected"
-          echo "DEVELOPER_DIR=$selected" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$selected" swift --version
+          xcodebuild -version || true
 
       - name: Build and package (ad-hoc signed)
         shell: bash

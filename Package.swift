@@ -1,11 +1,11 @@
-// swift-tools-version: 6.4
+// swift-tools-version: 6.3
 import Foundation
 import PackageDescription
 
 let package = Package(
     name: "OmniWM",
     platforms: [
-        .macOS(.v26)
+        .macOS("26.0")
     ],
     products: [
         .executable(
