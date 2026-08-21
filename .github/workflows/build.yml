@@ -1,0 +1,57 @@
+name: Build OmniWM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Cache GhosttyKit framework
+        id: ghostty-cache
+        uses: actions/cache@v4
+        with:
+          path: Frameworks/GhosttyKit.xcframework
+          key: ghostty-${{ hashFiles('Scripts/build-metadata.env') }}
+
+      - name: Download GhosttyKit framework
+        if: steps.ghostty-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          url="$(curl -sf https://api.github.com/repos/BarutSRB/OmniWM/releases/latest \
+            | python3 -c 'import json,sys; print(next(a["browser_download_url"] for a in json.load(sys.stdin)["assets"] if "GhosttyKit.xcframework" in a["name"]))')"
+          echo "Downloading $url"
+          mkdir -p Frameworks
+          curl -sfL "$url" -o /tmp/ghostty.zip
+          unzip -q /tmp/ghostty.zip -d Frameworks/
+          ls Frameworks/GhosttyKit.xcframework
+
+      - name: Build and package (ad-hoc signed)
+        run: ./Scripts/package-app.sh release dev
+
+      - name: Zip app bundle
+        run: |
+          cd dist
+          ditto -c -k --keepParent OmniWM.app "OmniWM-${GITHUB_SHA::7}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniWM-app-${{ github.sha }}
+          path: dist/OmniWM-*.zip
+          retention-days: 30
