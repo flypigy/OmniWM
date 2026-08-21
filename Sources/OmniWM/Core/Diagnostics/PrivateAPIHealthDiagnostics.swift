@@ -320,7 +320,6 @@ enum PrivateAPIHealthDiagnostics {
             "\(availability)"
         ))
         tests.append(slpsFocusProbe())
-        tests.append(test("GhosttyKit", .inconclusive, "statically linked; surface lifecycle not probed"))
         return tests
     }
 

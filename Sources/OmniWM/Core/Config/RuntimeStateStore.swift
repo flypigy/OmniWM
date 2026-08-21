@@ -5,31 +5,6 @@ import CoreGraphics
 import Darwin
 import Foundation
 
-struct RuntimeQuakeTerminalFrame: Codable, Equatable {
-    var x: Double
-    var y: Double
-    var width: Double
-    var height: Double
-
-    init(x: Double, y: Double, width: Double, height: Double) {
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-    }
-
-    init(frame: CGRect) {
-        x = frame.origin.x
-        y = frame.origin.y
-        width = frame.size.width
-        height = frame.size.height
-    }
-
-    var frame: CGRect {
-        CGRect(x: x, y: y, width: width, height: height)
-    }
-}
-
 struct IssueDraft: Codable, Equatable {
     var title: String = ""
     var actual: String = ""
@@ -54,8 +29,6 @@ struct RuntimeState: Codable, Equatable {
     var updaterLastCheckedAt: Date?
     var updaterSkippedReleaseTag: String?
     var commandPaletteLastMode: String?
-    var quakeTerminalUseCustomFrame: Bool?
-    var quakeTerminalCustomFrame: RuntimeQuakeTerminalFrame?
     var issueDraft: IssueDraft?
     var hasSeenIssueWalkthrough: Bool?
     var monitorSetupStatus: MonitorSetupStatus?
@@ -66,7 +39,6 @@ final class RuntimeStateStore {
     nonisolated static let defaultDirectoryURL = OmniWMStoragePaths.live.stateDirectory
     nonisolated static let fileName = "runtime-state.json"
     nonisolated static let defaultCommandPaletteLastMode = CommandPaletteMode.windows
-    nonisolated static let defaultQuakeTerminalUseCustomFrame = false
     nonisolated static let defaultMonitorSetupStatus = MonitorSetupStatus.notPresented
     nonisolated static var fileURL: URL {
         defaultDirectoryURL.appendingPathComponent(fileName, isDirectory: false)
@@ -163,30 +135,6 @@ final class RuntimeStateStore {
         }
     }
 
-    var quakeTerminalUseCustomFrame: Bool {
-        get { state.quakeTerminalUseCustomFrame ?? Self.defaultQuakeTerminalUseCustomFrame }
-        set {
-            guard quakeTerminalUseCustomFrame != newValue else { return }
-            state.quakeTerminalUseCustomFrame = newValue
-            if !newValue {
-                state.quakeTerminalCustomFrame = nil
-            }
-            scheduleSave()
-        }
-    }
-
-    var quakeTerminalCustomFrame: CGRect? {
-        get { state.quakeTerminalCustomFrame?.frame }
-        set {
-            let frame = newValue.map(RuntimeQuakeTerminalFrame.init(frame:))
-            guard state.quakeTerminalCustomFrame != frame else { return }
-            state.quakeTerminalCustomFrame = frame
-            if frame == nil {
-                state.quakeTerminalUseCustomFrame = false
-            }
-            scheduleSave()
-        }
-    }
 
     var issueDraft: IssueDraft? {
         get { state.issueDraft }

@@ -13,7 +13,6 @@ enum SurfaceKind: String, Equatable {
     case tabRail
     case dragGhost
     case utility
-    case quake
     case launchOverlay
     case secureInputIndicator
     case systemStats

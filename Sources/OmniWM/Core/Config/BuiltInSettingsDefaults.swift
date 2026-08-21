@@ -119,12 +119,6 @@ enum BuiltInSettingsDefaults {
             minHeight: 500
         ),
         AppRule(
-            id: uuid("7876C9EF-437E-4D4F-9C27-B1B02F4AABCE"),
-            bundleId: "com.mitchellh.ghostty",
-            minWidth: 90,
-            minHeight: 48
-        ),
-        AppRule(
             id: uuid("8ECAB78B-BCDD-4245-BC25-1609A49B1C86"),
             bundleId: "com.microsoft.Outlook",
             minWidth: 930,

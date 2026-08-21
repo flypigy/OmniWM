@@ -366,7 +366,6 @@ final class ServiceLifecycleManager {
         controller.workspaceManager.garbageCollectUnusedWorkspaces(focusedWorkspaceId: focusedWsId)
 
         scheduleStableTopologyInventory(reason: .monitorConfigurationChanged)
-        controller.reapplyQuakeTerminalGeometryForMonitorChange()
     }
 
     private func isUsableMonitorConfiguration(_ monitors: [Monitor]) -> Bool {

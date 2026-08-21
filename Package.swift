@@ -2,9 +2,6 @@
 import Foundation
 import PackageDescription
 
-let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
-let ghosttyMacOSLibraryDirectory = "\(packageDirectory)/Frameworks/GhosttyKit.xcframework/macos-arm64"
-
 let package = Package(
     name: "OmniWM",
     platforms: [
@@ -24,10 +21,6 @@ let package = Package(
         .package(url: "https://github.com/mattt/swift-toml.git", from: "2.0.0")
     ],
     targets: [
-        .binaryTarget(
-            name: "GhosttyKit",
-            path: "Frameworks/GhosttyKit.xcframework"
-        ),
         .target(
             name: "OmniWMIPC",
             path: "Sources/OmniWMIPC",
@@ -42,7 +35,6 @@ let package = Package(
         .target(
             name: "OmniWM",
             dependencies: [
-                "GhosttyKit",
                 "OmniWMIPC",
                 "OmniWMMenuBarAssertion",
                 .product(name: "TOML", package: "swift-toml")
@@ -61,12 +53,7 @@ let package = Package(
                 .linkedFramework("AppKit"),
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("Carbon"),
-                .linkedFramework("Metal"),
-                .linkedFramework("MetalKit"),
                 .linkedFramework("QuartzCore"),
-                .linkedLibrary("z"),
-                .linkedLibrary("c++"),
-                .unsafeFlags(["-L\(ghosttyMacOSLibraryDirectory)"]),
                 .unsafeFlags(["-F/System/Library/PrivateFrameworks", "-framework", "SkyLight"]),
                 .unsafeFlags(["-weak_framework", "FoundationModels"])
             ]

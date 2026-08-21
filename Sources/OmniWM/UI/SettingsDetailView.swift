@@ -55,8 +55,6 @@ struct SettingsDetailView: View {
             HotkeySettingsView(settings: settings, controller: controller)
         case .mouseTrackpad:
             MouseTrackpadSettingsTab(settings: settings, controller: controller)
-        case .quakeTerminal:
-            QuakeTerminalSettingsTab(settings: settings, controller: controller)
         case .reportIssue:
             ReportIssueSettingsTab(controller: controller)
         }

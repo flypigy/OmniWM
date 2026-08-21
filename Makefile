@@ -2,7 +2,6 @@
 
 SWIFTFORMAT_VERSION = 0.62.1
 SWIFTLINT_VERSION = 0.65.0
-SWIFT_WITH_GHOSTTY = LIBRARY_PATH="$$(./Scripts/ghostty-preflight.sh print-library-dir)$${LIBRARY_PATH:+:$$LIBRARY_PATH}"
 
 check-swiftformat-version:
 	@actual="$$(swiftformat --version 2>/dev/null || true)"; if [ "$$actual" != "$(SWIFTFORMAT_VERSION)" ]; then echo "error: SwiftFormat $(SWIFTFORMAT_VERSION) required; found $${actual:-missing}" >&2; exit 1; fi
@@ -28,8 +27,7 @@ lint-fix: check-tool-versions
 	swiftlint lint
 
 build:
-	./Scripts/ghostty-preflight.sh verify
-	$(SWIFT_WITH_GHOSTTY) swift build --arch arm64
+	swift build --arch arm64
 
 run:
 	./Scripts/package-app.sh debug dev

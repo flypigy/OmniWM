@@ -207,14 +207,13 @@ final class SettingsTOMLCodecTests: XCTestCase {
         let previous = try SettingsTOMLCodec.encode(.defaults())
 
         var export = try SettingsTOMLCodec.decode(previous)
-        export.quakeTerminalOpacity = nil
+        export.niriDefaultContainerPrimarySpan = nil
 
         let rewrittenData = try SettingsTOMLCodec.encode(export, preservingUnknownKeysFrom: previous)
         let rewritten = String(decoding: rewrittenData, as: UTF8.self)
         let decoded = try SettingsTOMLCodec.decode(rewrittenData)
 
-        XCTAssertFalse(rewritten.contains("opacity = 1.0"))
-        XCTAssertNil(decoded.quakeTerminalOpacity)
+        XCTAssertNil(decoded.niriDefaultContainerPrimarySpan)
     }
 
     @MainActor

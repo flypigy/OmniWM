@@ -155,21 +155,6 @@ final class WMController {
     @ObservationIgnored
     private let hiddenBarController: HiddenBarController
     @ObservationIgnored
-    private lazy var quakeTerminalController: QuakeTerminalController = .init(
-        settings: settings,
-        motionPolicy: motionPolicy,
-        captureRestoreTarget: { [weak self] in
-            guard let self else { return nil }
-            return self.captureQuakeTerminalRestoreTarget()
-        },
-        restoreFocusTarget: { [weak self] target in
-            self?.restoreQuakeTerminalFocus(to: target)
-        },
-        focusedWindowScreenProvider: { [weak self] in
-            self?.focusedManagedWindowScreenForQuakeTerminal()
-        }
-    )
-    @ObservationIgnored
     private lazy var commandPaletteController: CommandPaletteController = .init(motionPolicy: motionPolicy)
 
     @ObservationIgnored
@@ -413,16 +398,12 @@ final class WMController {
 
         setWorkspaceBarEnabled(settings.workspaceBarEnabled)
         setPreventSleepEnabled(settings.preventSleepEnabled)
-        setQuakeTerminalEnabled(settings.quakeTerminalEnabled)
         syncClipboardHistoryService()
 
         // External edits to settings.toml otherwise stop here at refreshStatusBar
         // and skip subsystems that read settings only at trigger time. Push the
         // remaining live values explicitly so editor saves take effect without
         // an app relaunch.
-        quakeTerminalController.applyGeometryToVisibleWindow()
-        quakeTerminalController.reloadOpacityConfig()
-        quakeTerminalController.reloadBackgroundBlur()
         updateWorkspaceBarSettings()
         updateHiddenBarSettings()
         _ = syncMouseWarpPolicy()
@@ -629,36 +610,6 @@ final class WMController {
         surfaceReconciler.noteWorldChanged()
         hiddenBarController.dismissPanel()
         return true
-    }
-
-    func setQuakeTerminalEnabled(_ enabled: Bool) {
-        if enabled {
-            quakeTerminalController.setup()
-        } else {
-            quakeTerminalController.cleanup()
-        }
-    }
-
-    func toggleQuakeTerminal() {
-        guard settings.quakeTerminalEnabled else { return }
-        quakeTerminalController.toggle()
-    }
-
-    func reapplyQuakeTerminalGeometryForMonitorChange() {
-        guard settings.quakeTerminalEnabled else { return }
-        quakeTerminalController.applyGeometryToVisibleWindow()
-    }
-
-    func reloadQuakeTerminalOpacity() {
-        quakeTerminalController.reloadOpacityConfig()
-    }
-
-    func reloadQuakeTerminalBackgroundEffect() {
-        quakeTerminalController.reloadOpacityConfig()
-    }
-
-    func reloadQuakeTerminalBackgroundBlur() {
-        quakeTerminalController.reloadBackgroundBlur()
     }
 
     func requestWorkspaceBarRefresh() {
@@ -1465,60 +1416,6 @@ final class WMController {
             return frontmostToken ?? focusedToken
         }
         return focusedToken ?? frontmostToken
-    }
-
-    func captureQuakeTerminalRestoreTarget() -> QuakeTerminalRestoreTarget? {
-        guard let token = workspaceManager.renderableFocusToken
-            ?? focusedOrFrontmostWindowTokenForAutomation(preferFrontmostWhenNonManagedFocusActive: true)
-        else {
-            return nil
-        }
-
-        if workspaceManager.entry(for: token) != nil {
-            return .managed(token)
-        }
-
-        guard let axRef = AXWindowService.axWindowRef(for: UInt32(token.windowId), pid: token.pid)
-        else {
-            return nil
-        }
-
-        return .external(
-            KeyboardFocusTarget(
-                token: token,
-                axRef: axRef,
-                workspaceId: nil,
-                isManaged: false
-            )
-        )
-    }
-
-    func focusedManagedWindowScreenForQuakeTerminal() -> NSScreen? {
-        guard let token = focusedOrFrontmostWindowTokenForAutomation(
-            preferFrontmostWhenNonManagedFocusActive: true
-        ),
-            let entry = workspaceManager.entry(for: token)
-        else {
-            return nil
-        }
-
-        if let monitorId = entry.observedState.monitorId
-            ?? entry.desiredState.monitorId
-            ?? workspaceManager.monitorId(for: entry.workspaceId),
-            let screen = screen(for: monitorId)
-        {
-            return screen
-        }
-
-        if let frame = entry.observedState.frame
-            ?? entry.desiredState.floatingFrame
-            ?? entry.floatingState?.lastFrame,
-            let monitor = frame.center.monitorApproximation(in: workspaceManager.monitors)
-        {
-            return screen(for: monitor.id)
-        }
-
-        return nil
     }
 
     private func screen(for monitorId: Monitor.ID) -> NSScreen? {
@@ -3183,16 +3080,6 @@ extension WMController {
         lockScreenObserver.isFrontmostAppLockScreen()
     }
 
-    func isPointInQuakeTerminal(_ point: CGPoint) -> Bool {
-        guard settings.quakeTerminalEnabled,
-              quakeTerminalController.visible,
-              let window = quakeTerminalController.window
-        else {
-            return false
-        }
-        return window.frame.contains(point)
-    }
-
     func isPointInOwnWindow(_ point: CGPoint) -> Bool {
         ownedWindowRegistry.contains(point: point)
     }
@@ -3381,44 +3268,6 @@ extension WMController {
             )
         }
         return changed
-    }
-
-    func restoreQuakeTerminalFocus(to target: QuakeTerminalRestoreTarget) {
-        switch target {
-        case let .managed(token):
-            guard workspaceManager.entry(for: token) != nil else { return }
-            focusWindow(token)
-
-        case let .external(target):
-            if workspaceManager.entry(for: target.token) != nil {
-                focusWindow(target.token)
-                return
-            }
-            guard !isLockScreenActive else { return }
-            if hasStartedServices {
-                guard !isFrontmostAppLockScreen() else { return }
-            }
-
-            let pid = target.pid
-            guard !workspaceManager.isAppHidden(pid: pid) else { return }
-            guard let app = NSRunningApplication(processIdentifier: pid),
-                  !app.isTerminated
-            else {
-                return
-            }
-
-            let intent = intentLedger.registerActivateApp(pid: pid)
-            deadlineWheel.schedule(intentId: intent.id, after: .seconds(1))
-            if let axRef = AXWindowService.axWindowRef(for: UInt32(target.windowId), pid: pid) {
-                performWindowFronting(
-                    pid: pid,
-                    windowId: target.windowId,
-                    axRef: axRef
-                )
-            } else {
-                windowFocusOperations.activateApp(pid)
-            }
-        }
     }
 
     func focusWindow(

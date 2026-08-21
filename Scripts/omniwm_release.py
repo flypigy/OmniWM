@@ -261,7 +261,6 @@ class ReleaseManager:
         dist = self.main / "dist"
         return {
             "app": dist / f"OmniWM-v{version}.zip",
-            "ghostty": dist / f"GhosttyKit.xcframework-v{version}.zip",
             "notes": dist / f"release-notes-v{version}.md",
             "source": dist / f"release-source-v{version}.txt",
         }
@@ -370,7 +369,7 @@ class ReleaseManager:
         )
         require(isinstance(value["assets"], dict), "manifest assets must be an object")
         for name, asset in value["assets"].items():
-            require(name in {"app", "ghostty"}, f"manifest has unsupported asset {name}")
+            require(name in {"app"}, f"manifest has unsupported asset {name}")
             require(
                 isinstance(asset, dict)
                 and set(asset) == {"path", "sha256"}
@@ -417,11 +416,11 @@ class ReleaseManager:
             )
             return
         require(
-            set(value["assets"]) == {"app", "ghostty"},
-            "prepared release manifest must contain exactly app and ghostty assets",
+            set(value["assets"]) == {"app"},
+            "prepared release manifest must contain exactly the app asset",
         )
         expected_paths = self.asset_paths(version)
-        for name in ("app", "ghostty"):
+        for name in ("app",):
             require(
                 value["assets"][name]["path"] == str(expected_paths[name]),
                 f"manifest {name} asset path is not canonical",
@@ -1015,7 +1014,6 @@ class ReleaseManager:
             embedded_hash=embedded,
             signing_identity=self.config.signing_identity,
         )
-        self.create_zip(self.main / "Frameworks" / "GhosttyKit.xcframework", paths["ghostty"])
         self.create_release_text(
             version,
             plan["previous_version"],
@@ -1028,7 +1026,6 @@ class ReleaseManager:
         )
         self.run_git(self.main, "tag", "-a", plan["tag"], "-m", f"OmniWM v{version}")
         app_sha = sha256_file(paths["app"])
-        ghostty_sha = sha256_file(paths["ghostty"])
         self.tap_cask.write_text(self.canonical_cask_text(version, app_sha), encoding="utf-8")
         self.runner.run(["brew", "audit", "--cask", "omniwm"], cwd=self.tap, capture=False)
         self.run_git(self.tap, "add", "Casks/omniwm.rb")
@@ -1045,7 +1042,6 @@ class ReleaseManager:
                 "cask_sha256": cask_sha,
                 "assets": {
                     "app": {"path": str(paths["app"]), "sha256": app_sha},
-                    "ghostty": {"path": str(paths["ghostty"]), "sha256": ghostty_sha},
                 },
             }
         )
@@ -1073,7 +1069,7 @@ class ReleaseManager:
             manifest["embedded_git_hash"] == expected_embedded,
             "manifest embedded Git hash does not derive from the release commit",
         )
-        for key in ("app", "ghostty"):
+        for key in ("app",):
             path = Path(manifest["assets"][key]["path"])
             require(path.exists(), f"missing {key} asset: {path}")
             require(sha256_file(path) == manifest["assets"][key]["sha256"], f"{key} asset hash drift")
@@ -1174,7 +1170,6 @@ class ReleaseManager:
                     "create",
                     manifest["tag"],
                     manifest["assets"]["app"]["path"],
-                    manifest["assets"]["ghostty"]["path"],
                     "--repo",
                     self.config.github_repo,
                     "--title",

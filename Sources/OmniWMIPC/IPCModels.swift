@@ -281,7 +281,6 @@ public enum IPCCommandName: String, Codable, CaseIterable, Equatable, Sendable {
     case toggleNativeFullscreen = "toggle-native-fullscreen"
     case toggleOverview = "toggle-overview"
     case toggleSystemStats = "toggle-system-stats"
-    case toggleQuakeTerminal = "toggle-quake-terminal"
     case toggleWorkspaceBar = "toggle-workspace-bar"
     case hiddenBarPanel = "hidden-bar-panel"
     case toggleFocusedWindowFloating = "toggle-focused-window-floating"
@@ -414,7 +413,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
     case toggleNativeFullscreen
     case toggleOverview
     case toggleSystemStats
-    case toggleQuakeTerminal
     case toggleWorkspaceBar
     case hiddenBarPanel
     case toggleFocusedWindowFloating
@@ -576,8 +574,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
             .toggleOverview
         case .toggleSystemStats:
             .toggleSystemStats
-        case .toggleQuakeTerminal:
-            .toggleQuakeTerminal
         case .toggleWorkspaceBar:
             .toggleWorkspaceBar
         case .hiddenBarPanel:
@@ -869,9 +865,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
         case .toggleSystemStats:
             try requireNoArguments()
             self = .toggleSystemStats
-        case .toggleQuakeTerminal:
-            try requireNoArguments()
-            self = .toggleQuakeTerminal
         case .toggleWorkspaceBar:
             try requireNoArguments()
             self = .toggleWorkspaceBar
@@ -1115,8 +1108,6 @@ extension IPCCommandRequest: Codable {
             self = .toggleOverview
         case .toggleSystemStats:
             self = .toggleSystemStats
-        case .toggleQuakeTerminal:
-            self = .toggleQuakeTerminal
         case .toggleWorkspaceBar:
             self = .toggleWorkspaceBar
         case .hiddenBarPanel:
@@ -1294,8 +1285,6 @@ extension IPCCommandRequest: Codable {
         case .toggleOverview:
             break
         case .toggleSystemStats:
-            break
-        case .toggleQuakeTerminal:
             break
         case .toggleWorkspaceBar:
             break

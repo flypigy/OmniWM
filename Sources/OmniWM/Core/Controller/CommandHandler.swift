@@ -233,8 +233,6 @@ final class CommandHandler {
             controller.toggleWorkspaceBarVisibility()
         case .toggleHiddenBarPanel:
             controller.toggleHiddenBarPanel()
-        case .toggleQuakeTerminal:
-            controller.toggleQuakeTerminal()
         case .toggleWorkspaceLayout:
             toggleWorkspaceLayout()
         case .toggleOverview:
