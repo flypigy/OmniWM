@@ -4,6 +4,10 @@ title: OmniWM Architecture Guide
 
 # OmniWM Architecture Guide
 
+> **Fork note:** this build removes the Quake terminal (libghostty), the Dwindle
+> (BSP) layout engine, and Scratchpads. It is Niri-scrolling-layout only.
+> References to those features below are historical and kept for context.
+
 This document is for contributors who want to understand OmniWM's internals. It is not a user guide (see [Documentation Home](index.md)) or IPC/CLI reference (see [IPC-CLI.md](IPC-CLI.md)). For contribution process, see the [Contribution Guide](CONTRIBUTING.md).
 
 **Prerequisites**: Familiarity with Swift, macOS development concepts (AppKit, AXUIElement, CGWindowID), and basic tiling window manager concepts.

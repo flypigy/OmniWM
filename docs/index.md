@@ -4,7 +4,7 @@ title: OmniWM Documentation
 
 # OmniWM Documentation
 
-OmniWM is a tiling window manager for macOS with scrolling columns, BSP tiling, a Ghostty-powered quake terminal, a unified command palette, and IPC/CLI automation.
+OmniWM is a tiling window manager for macOS with scrolling columns, a unified command palette, and IPC/CLI automation.
 
 This site is the documentation hub for architecture notes and technical reference material. For the repository overview and screenshots, see the [project README](https://github.com/BarutSRB/OmniWM/blob/main/README.md).
 

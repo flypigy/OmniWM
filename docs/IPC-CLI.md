@@ -4,6 +4,10 @@ title: OmniWM IPC & CLI Reference
 
 # OmniWM IPC & CLI Reference
 
+> **Fork note:** this build removes the Quake terminal (libghostty), the Dwindle
+> (BSP) layout engine, and Scratchpads. It is Niri-scrolling-layout only.
+> References to those features below are historical and kept for context.
+
 This document covers the OmniWM automation surface. For the docs hub, see [Documentation Home](index.md). For internal architecture, see [ARCHITECTURE.md](ARCHITECTURE.md). For contribution process, see the [Contribution Guide](CONTRIBUTING.md).
 
 ## Table of Contents

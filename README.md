@@ -381,15 +381,13 @@
 </p>
 
 
-- Real quake/sticky terminal using ghostty's libghostty
 - macOS native tab support
 - IPC/CLI
-- Scrathpad/Sticky windows for any app
 - Niri Overview
 - Unified command palette for windows and app menus
 - App menu anywhere
-- Niri tabbed columns and Dwindle tile groups
-- Niri and Dwindle layout
+- Niri tabbed columns
+- Niri scrolling-column layout
 - Hide/unhide status bar icons (Similar to Ice Bar)
 - Keep awake (Similar to Caffeine)
 - Interactive workspace/app icon bar
@@ -397,7 +395,6 @@
 
 ## Known Limitations
 
-- **Dwindle group restore** - Group membership and tab order are runtime layout state and are not restored after OmniWM restarts.
 
 ## Performance & Trust
 
@@ -520,22 +517,12 @@ The setup assistant opens automatically when OmniWM first sees multiple displays
 
 ### Layout Modes
 
-OmniWM offers two layout engines that you can switch between per workspace:
-
-**Niri (Scrolling Columns)** - Windows arranged in vertical columns that scroll horizontally. Each column can have multiple stacked windows or be "tabbed" (multiple windows, one visible at a time). Best for wide monitors with many windows.
-
-**Hyprland Dwindle (BSP)** - Binary space partition layout that recursively divides screen space. Each new window splits the space in half, and a tile can group multiple windows as tabs. Best for traditional tiling with predictable layouts.
-
-Use the `Toggle Workspace Layout` shortcut below to switch layouts per workspace or configure them in GUI settings.
+OmniWM uses the **Niri (Scrolling Columns)** layout engine: windows arranged in vertical columns that scroll horizontally. Each column can have multiple stacked windows or be "tabbed" (multiple windows, one visible at a time).
 
 ### Keyboard Shortcuts
 
 All shortcuts are customizable in Settings > Hotkeys. `Hyper` is the literal `Control + Option + Shift + Command` chord by default; which modifiers make up `Hyper` is configurable in Settings > Hotkeys (for example, exclude `Shift` to keep `Hyper + Shift + …` free for extra bindings). Changing the combination retargets every shortcut that currently resolves to `Hyper` onto the new one, so the shortcut list updates in place as you toggle the modifiers. Optionally pick a **System Hyper Trigger** — a single key (Caps Lock, F13–F20, or a left- or right-side modifier) or an extra mouse button that acts as `Hyper` while held (this needs Input Monitoring permission). Leave the trigger as `None` if you already produce `Hyper` another way, such as a Karabiner Elements remap. The tables below list all the default hotkeys:
 
-Layout legend:
-- `Shared` works in any active layout.
-- `Niri` works only when the active workspace uses the Niri layout.
-- `Dwindle` works only when the active workspace uses the Dwindle layout.
 
 #### Workspace
 
@@ -568,7 +555,6 @@ Layout legend:
 | Open Menu Anywhere | `Control + Option + M` | `Shared` |
 | Toggle Workspace Bar | `Unassigned` | `Shared` |
 | Toggle Hidden Icons Bar | `Unassigned` | `Shared` |
-| Toggle Quake Terminal | `` Option + ` `` | `Shared` |
 | Toggle Overview | `Option + Shift + O` | `Shared` |
 
 #### Move Window
@@ -588,7 +574,7 @@ Layout legend:
 | Move Workspace to Left / Right / Up / Down Monitor | `Unassigned` | `Shared` |
 | Move Window to Left / Right / Up / Down Monitor | `Unassigned` | `Shared` |
 
-The workspace-to-monitor actions target the active workspace and intentionally use the same temporary runtime override as `omniwmctl workspace move-to-monitor --force`. They do not rewrite the workspace's Home Monitor or swap workspaces, and unsafe fullscreen, hidden-app, scratchpad, or focus states still block the move.
+The workspace-to-monitor actions target the active workspace and intentionally use the same temporary runtime override as `omniwmctl workspace move-to-monitor --force`. They do not rewrite the workspace's Home Monitor or swap workspaces, and unsafe fullscreen, hidden-app or focus states still block the move.
 
 The window-to-monitor actions send the focused window directly to the current workspace on the adjacent routed display, independently of **Move Window Across Monitor at Edge**. They do not wrap when no monitor exists in that direction. **Follow Window to Monitor** controls whether focus follows the window; when it is off, you remain in the source workspace.
 
@@ -601,18 +587,8 @@ The window-to-monitor actions send the focused window directly to the current wo
 | Balance Sizes | `Option + Shift + B` | `Shared` |
 | Cycle Size Forward | `Option + .` | `Shared` |
 | Cycle Size Backward | `Option + ,` | `Shared` |
-| Move to Root | `Unassigned` | `Dwindle` |
-| Toggle Split | `Unassigned` | `Dwindle` |
-| Swap Split | `Unassigned` | `Dwindle` |
-| Grow Horizontally / Vertically | `Unassigned` | `Dwindle` |
-| Shrink Horizontally / Vertically | `Unassigned` | `Dwindle` |
-| Grow / Shrink Focused Window | `Unassigned` | `Dwindle` |
-| Preselect Left / Right / Up / Down | `Unassigned` | `Dwindle` |
-| Clear Preselection | `Unassigned` | `Dwindle` |
 | Raise All Floating Windows | `Option + Shift + R` | `Shared` |
 | Toggle Focused Window Floating | `Unassigned` | `Shared` |
-| Assign Focused Window to Scratchpad | `Unassigned` | `Shared` |
-| Toggle Scratchpad Window | `Unassigned` | `Shared` |
 | Toggle Workspace Layout | `Option + Shift + L` | `Shared` |
 
 #### Container and Column
@@ -620,58 +596,12 @@ The window-to-monitor actions send the focused window directly to the current wo
 | Action | Default Shortcut | Layout |
 |--------|------------------|--------|
 | Move Container Left / Right | `Control + Option + Shift + Left / Right Arrow` | `Shared` |
-| Move Container Up / Down | `Unassigned` | `Dwindle` |
 | Toggle Column Tabbed | `Option + T` | `Niri` |
 | Toggle Container Full Primary Span | `Option + Shift + F` | `Niri` |
 
 The daily `Focus` and `Move` shortcuts adapt to the active layout. In Niri, `Move Left / Right` expels the focused window from a multi-window column or consumes a single-window column into its neighbor, while `Move Up / Down` reorders within the column.
 
-#### Dwindle Groups
-
-Dwindle groups use the existing Focus and Move bindings, so there are no separate group shortcuts to memorize. Only the active member occupies the tile; the other members stay hidden and the clickable tab rail shows their order.
-
-| Goal | Default Shortcut | Behavior |
-|------|------------------|----------|
-| Focus another tile | `Option + Arrow Keys` | Left / Right are always spatial. Up / Down are spatial for a singleton tile. |
-| Select the next / previous tab | `Option + Down / Up Arrow` | Within a group, Down advances and Up goes back. At the group edge OmniWM tries a spatial tile, then the configured monitor transition, and wraps locally only when neither exit succeeds. |
-| Join a singleton into a tile or group | `Option + Shift + Arrow Keys` | Joins the focused singleton with the touching tile in that direction. |
-| Extract the active tab | `Option + Shift + Arrow Keys` | When the focused tile is grouped, extracts only its active tab onto the requested side. |
-| Move the complete tile or group | `Control + Option + Shift + Left / Right Arrow` | `Move Container` swaps the whole structure. Up / Down are advanced, unassigned Dwindle actions. |
-| Select an exact tab | Click its tab rail item | Reveals and focuses that member without changing the group order. |
-
-Moving a tab directly from one existing group into another is intentionally a two-step operation: extract it first, then move the resulting singleton toward the destination group. A singleton at a genuine workspace edge can still use the normal cross-monitor Move behavior; a rejected group mutation does not fall through to tile swapping or monitor movement.
-
-The unassigned advanced actions are available in Settings > Hotkeys. `Focus Down or Top / Up or Bottom` always wraps within the active Niri column or Dwindle group. `Reorder Window Up / Down` changes the active member's position by one without wrapping. `Move Container` is the whole-structure escape hatch and never transfers to another monitor at a workspace edge. Dwindle join/extract and Move Container operations are intentionally unavailable while Overview is open; leave Overview before changing a Dwindle tree.
-
-#### Quake Terminal (Inside Terminal)
-
-| Action | Shortcut |
-|--------|----------|
-| New Tab | `Cmd + T` |
-| Close Tab | `Cmd + W` |
-| Next Tab | `Cmd + Shift + ]` |
-| Previous Tab | `Cmd + Shift + [` |
-| Next Tab (Alt) | `Ctrl + Tab` |
-| Previous Tab (Alt) | `Ctrl + Shift + Tab` |
-| Select Tab 1-9 | `Cmd + 1-9` |
-| Split Pane (Horizontal) | `Cmd + D` |
-| Split Pane (Vertical) | `Cmd + Shift + D` |
-| Close Pane | `Cmd + Shift + W` |
-| Equalize Splits | `Cmd + Shift + =` |
-| Navigate Pane | `Cmd + Option + Arrow Keys` |
-
 ### Features
-
-#### Quake Terminal
-
-A true quake/sticky terminal (powered by Ghostty's libghostty) that slides in from the screen edge and:
-- Toggle it from the global shortcut shown in `Keyboard Shortcuts`
-- Supports multiple tabs and splits within tabs
-- Tab and pane shortcuts are listed in **Quake Terminal (Inside Terminal)**
-- Mouse resize by dragging edges; `Option + drag` to move (remembers size/position per monitor)
-- Configure position (top/bottom/left/right/center), size, opacity, and background effect in Settings
-- Choose Standard Blur with an adjustable radius or native Regular Glass/Clear Glass; switching effects preserves the saved Standard Blur radius
-- Auto-hides on focus loss (optional)
 
 #### Command Palette
 
@@ -704,7 +634,6 @@ See all windows at once with thumbnails:
 - Assigned structural move, reorder, consume/expel, and workspace-transfer shortcuts operate on the selected thumbnail while Overview is open
 - In Niri workspaces, reorder windows and columns, consume or expel windows, move windows into or out of columns, move windows across workspaces and monitors, and move whole columns between Niri workspaces
 - Adjacent-workspace fallback actions can create the next compatible unused numeric workspace when moving past the current workspace edge
-- In Dwindle workspaces, Overview supports moving windows across workspaces and closing them without adding Overview-only tree placement controls
 - A successful move keeps the moved window selected and activates its destination workspace and monitor behind Overview
 - `Option + drag` a thumbnail onto a workspace, an exact window position, or a Niri column gap; layouts without an exact placement equivalent fall back to moving it to the destination workspace
 - `Command + W` closes the selected window once per press and keeps Overview open; selection advances only after the window has closed
@@ -787,7 +716,6 @@ initialContainerPrimarySpan = 0.5
 Requirements:
 - SwiftPM with Swift 6.4+
 - macOS 26.0+
-- Ghostty's arm64 archive (build Ghostty and copy it to `Frameworks/GhosttyKit.xcframework/macos-arm64/libghostty-internal-fat.a`)
 
 Use the bundled Debug launch for day-to-day development:
 
