@@ -7,6 +7,7 @@ import Testing
 @testable import OmniWM
 
 @Suite("Wine window adaptation")
+@MainActor
 struct WineWindowAdaptationTests {
     private func makeFacts(
         subrole: String = kAXUnknownSubrole as String,
