@@ -822,7 +822,17 @@ enum StructuralMutationOutcome: Equatable {
         var states: [WindowToken: NiriContainerSizingState]?
         for token in windowTokens where pass.engine.findNode(for: token, in: pass.wsId) == nil {
             let state: NiriContainerSizingState?
-            if let detached = controller.workspaceManager.restoreIntent(for: token)?.detachedNiriContainerSizingState {
+            if controller.workspaceManager.admissionHints(for: token)?.wineStyleAdaptation == true {
+                // Wine-style windows tile as full-width columns so a focused
+                // borderless game window covers the viewport.
+                state = NiriContainerSizingState(
+                    width: .proportion(1.0),
+                    presetWidthIndex: nil,
+                    isFullWidth: true,
+                    savedWidth: nil,
+                    hasManualSingleWindowWidthOverride: false
+                )
+            } else if let detached = controller.workspaceManager.restoreIntent(for: token)?.detachedNiriContainerSizingState {
                 state = detached
             } else if let initial = controller.workspaceManager.admissionHints(for: token)?
                 .initialNiriContainerPrimarySpan

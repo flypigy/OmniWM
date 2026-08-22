@@ -646,6 +646,14 @@ import QuartzCore
                     mergedConstraints.minSize.height = max(mergedConstraints.minSize.height, observedMin.height)
                 }
                 mergedConstraints = mergedConstraints.normalized()
+                if entry.admissionHints.wineStyleAdaptation, mergedConstraints.isFixed {
+                    // Wine-style windows report no zoom button/grow area, which
+                    // pins them as fixed-size and would freeze their geometry;
+                    // the tiling engine must stay free to size their column.
+                    mergedConstraints.isFixed = false
+                    mergedConstraints.minSize = CGSize(width: 1, height: 1)
+                    mergedConstraints = mergedConstraints.normalized()
+                }
             }
 
             let hiddenState = controller.workspaceManager.hiddenState(for: entry.token)
@@ -1615,7 +1623,7 @@ import QuartzCore
                     wsForWindow = restoredEntry.workspaceId
                     ruleEffects = restoredEntry.ruleEffects
                     admissionHints = restoredEntry.admissionHints
-                } else if appFullscreen {
+                } else if appFullscreen, !decision.admissionHints.wineStyleAdaptation {
                     _ = controller.workspaceManager.markNativeFullscreenSuspended(
                         existingEntry.token,
                         ownsNonManagedFocus: false

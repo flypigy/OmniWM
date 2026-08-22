@@ -81,6 +81,12 @@ struct GeneralSettingsTab: View {
                 Toggle("Enable Animations", isOn: animationsEnabled)
                 SettingsCaption("Turns OmniWM-authored animations on or off live without relaunching.")
 
+                Toggle("Wine Window Adaptation", isOn: $settings.wineWindowAdaptation)
+                    .onChange(of: settings.wineWindowAdaptation) { _, _ in
+                        controller.updateAppRules()
+                    }
+                SettingsCaption("Admits borderless top-level windows (Wine games) into the scroll strip as full-width columns.")
+
                 AppWindowCornerSettings(preferences: windowCornerPreferences)
             }
 

@@ -51,6 +51,7 @@ struct ManagedWindowRuleEffects: Equatable, Sendable {
 
 struct ManagedWindowAdmissionHints: Equatable, Sendable {
     var initialNiriContainerPrimarySpan: Double?
+    var wineStyleAdaptation = false
 
     static let none = ManagedWindowAdmissionHints()
 }
@@ -248,10 +249,15 @@ struct WindowDecisionDebugSnapshot: Equatable, Sendable {
 
 @MainActor
 final class WindowRuleEngine {
+    /// Wine-style window adaptation (borderless AXUnknown top-level windows,
+    /// e.g. Wine games). Mirrors the `general.wineWindowAdaptation` setting.
+    var wineWindowAdaptationEnabled = true
+
     static let cleanShotBundleId = "pl.maketheweb.cleanshotx"
     static let systemTextInputPanelRuleName = "systemTextInputPanel"
     static let ownedWindowRuleName = "ownedWindow"
     nonisolated static let helpTagSurfaceRuleName = "helpTagSurface"
+    nonisolated static let wineAdaptationRuleName = "wine-style-adaptation"
     nonisolated static let transientWidgetSurfaceRuleName = "transientWidgetSurface"
     nonisolated static let hiddenTitleBarWindowRuleName = "hiddenTitleBarWindow"
     private static let cleanShotRecordingOverlayRuleName = "cleanShotRecordingOverlay"
@@ -419,6 +425,21 @@ final class WindowRuleEngine {
         )
     }
 
+    nonisolated static func isWineStyleWindow(_ facts: WindowRuleFacts) -> Bool {
+        guard facts.ax.attributeFetchSucceeded,
+              facts.ax.role == (kAXWindowRole as String),
+              facts.ax.subrole == (kAXUnknownSubrole as String),
+              !facts.ax.hasCloseButton,
+              !facts.ax.hasFullscreenButton,
+              !facts.ax.hasZoomButton,
+              !facts.ax.hasMinimizeButton
+        else { return false }
+        // Wine game surfaces are true top-level windows at the base level;
+        // popups/overlays carry a parent or floating tags and stay excluded.
+        guard let windowServer = facts.windowServer else { return false }
+        return windowServer.level == 0 && windowServer.parentId == 0
+    }
+
     nonisolated static func isTransientWidgetAXCandidate(_ facts: AXWindowFacts) -> Bool {
         facts.attributeFetchSucceeded
             && facts.role == (kAXWindowRole as String)
@@ -507,6 +528,22 @@ final class WindowRuleEngine {
             admissionHints: admissionHints
         ) {
             return cleanShotDecision
+        }
+
+        if wineWindowAdaptationEnabled, Self.isWineStyleWindow(facts) {
+            return WindowDecision(
+                disposition: .managed,
+                source: .builtInRule(Self.wineAdaptationRuleName),
+                layoutDecisionKind: .explicitLayout,
+                workspaceName: workspaceName,
+                ruleEffects: effects,
+                admissionHints: ManagedWindowAdmissionHints(
+                    initialNiriContainerPrimarySpan: admissionHints.initialNiriContainerPrimarySpan,
+                    wineStyleAdaptation: true
+                ),
+                heuristicReasons: [],
+                deferredReason: nil
+            )
         }
 
         if facts.ax.title == nil,

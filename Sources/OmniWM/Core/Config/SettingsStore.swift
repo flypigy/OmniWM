@@ -127,6 +127,10 @@ final class SettingsStore {
         didSet { scheduleSave() }
     }
 
+    var wineWindowAdaptation = SettingsStore.defaultExport.wineWindowAdaptation {
+        didSet { scheduleSave() }
+    }
+
     var niriRememberWindowWidth = SettingsStore.defaultExport.niriRememberWindowWidth {
         didSet { scheduleSave() }
     }
@@ -644,6 +648,7 @@ final class SettingsStore {
             hiddenBarHiddenBundleIDs: hiddenBarHiddenBundleIDs,
             hiddenBarRehideIntervalSeconds: hiddenBarRehideIntervalSeconds,
             animationsEnabled: animationsEnabled,
+            wineWindowAdaptation: wineWindowAdaptation,
             clipboardHistoryEnabled: clipboardHistoryEnabled,
             clipboardMaxItems: clipboardMaxItems,
             clipboardMaxItemBytes: clipboardMaxItemBytes,
@@ -779,6 +784,7 @@ final class SettingsStore {
             export.hiddenBarRehideIntervalSeconds
         )
         animationsEnabled = export.animationsEnabled
+        wineWindowAdaptation = export.wineWindowAdaptation
         clipboardHistoryEnabled = export.clipboardHistoryEnabled
         clipboardMaxItems = export.clipboardMaxItems
         clipboardMaxItemBytes = export.clipboardMaxItemBytes

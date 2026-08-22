@@ -111,6 +111,7 @@ struct SettingsExport: Equatable {
     var hiddenBarHiddenBundleIDs: [String]
     var hiddenBarRehideIntervalSeconds: Double
     var animationsEnabled: Bool
+    var wineWindowAdaptation: Bool
 
     var clipboardHistoryEnabled: Bool
     var clipboardMaxItems: Int
@@ -213,6 +214,7 @@ extension SettingsExport {
             hiddenBarHiddenBundleIDs: [],
             hiddenBarRehideIntervalSeconds: 5,
             animationsEnabled: true,
+            wineWindowAdaptation: true,
             clipboardHistoryEnabled: false,
             clipboardMaxItems: 200,
             clipboardMaxItemBytes: 8_388_608,

@@ -965,6 +965,7 @@ final class WMController {
     }
 
     func rebuildAppRulesCache() {
+        windowRuleEngine.wineWindowAdaptationEnabled = settings.wineWindowAdaptation
         windowRuleEngine.rebuild(rules: settings.appRules)
     }
 

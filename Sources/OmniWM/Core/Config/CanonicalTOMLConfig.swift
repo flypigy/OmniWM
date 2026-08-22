@@ -40,6 +40,7 @@ struct CanonicalTOMLConfig: Codable, Equatable {
         var updateChecksEnabled: Bool
         var ipcEnabled: Bool
         var animationsEnabled: Bool
+        var wineWindowAdaptation: Bool
     }
 
     struct Focus: Codable, Equatable {
@@ -454,6 +455,12 @@ extension CanonicalTOMLConfig.General {
             Bool.self,
             forKey: .animationsEnabled,
             default: defaults.animationsEnabled,
+            recovering: recovering
+        )
+        wineWindowAdaptation = try container.decode(
+            Bool.self,
+            forKey: .wineWindowAdaptation,
+            default: defaults.wineWindowAdaptation,
             recovering: recovering
         )
     }
@@ -1016,7 +1023,8 @@ extension CanonicalTOMLConfig {
             preventSleepEnabled: export.preventSleepEnabled,
             updateChecksEnabled: export.updateChecksEnabled,
             ipcEnabled: export.ipcEnabled,
-            animationsEnabled: export.animationsEnabled
+            animationsEnabled: export.animationsEnabled,
+            wineWindowAdaptation: export.wineWindowAdaptation
         )
         focus = Focus(
             followsMouse: export.focusFollowsMouse,
@@ -1223,6 +1231,7 @@ extension CanonicalTOMLConfig {
             hiddenBarHiddenBundleIDs: hiddenBar.hiddenBundleIDs,
             hiddenBarRehideIntervalSeconds: hiddenBar.rehideIntervalSeconds,
             animationsEnabled: general.animationsEnabled,
+            wineWindowAdaptation: general.wineWindowAdaptation,
             clipboardHistoryEnabled: clipboard.historyEnabled,
             clipboardMaxItems: clipboard.maxItems,
             clipboardMaxItemBytes: clipboard.maxItemBytes,
