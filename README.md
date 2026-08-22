@@ -519,6 +519,10 @@ The setup assistant opens automatically when OmniWM first sees multiple displays
 
 OmniWM uses the **Niri (Scrolling Columns)** layout engine: windows arranged in vertical columns that scroll horizontally. Each column can have multiple stacked windows or be "tabbed" (multiple windows, one visible at a time).
 
+**Remember Window Width per App** (Settings → Niri Layout, default off): when enabled, manually adjusting a column's width (mouse drag on the column edge or the keyboard width commands) stores the resulting width in that app's App Rule (`initialContainerPrimarySpan`). New windows of the same app open with the remembered width.
+
+**Wine Window Adaptation** (Settings → General, default on): borderless top-level windows from Wine games (non-standard AX subrole, no window buttons) are admitted into the scroll strip as full-width columns, so a focused game window covers the viewport. Misreported AX fullscreen state is ignored for these windows.
+
 ### Keyboard Shortcuts
 
 All shortcuts are customizable in Settings > Hotkeys. `Hyper` is the literal `Control + Option + Shift + Command` chord by default; which modifiers make up `Hyper` is configurable in Settings > Hotkeys (for example, exclude `Shift` to keep `Hyper + Shift + …` free for extra bindings). Changing the combination retargets every shortcut that currently resolves to `Hyper` onto the new one, so the shortcut list updates in place as you toggle the modifiers. Optionally pick a **System Hyper Trigger** — a single key (Caps Lock, F13–F20, or a left- or right-side modifier) or an extra mouse button that acts as `Hyper` while held (this needs Input Monitoring permission). Leave the trigger as `None` if you already produce `Hyper` another way, such as a Karabiner Elements remap. The tables below list all the default hotkeys:
