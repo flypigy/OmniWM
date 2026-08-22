@@ -2,7 +2,7 @@ name: Build OmniWM
 
 on:
   push:
-    branches: [main, slim-down]
+    branches: [main, slim-down, features]
   workflow_dispatch:
 
 permissions:
