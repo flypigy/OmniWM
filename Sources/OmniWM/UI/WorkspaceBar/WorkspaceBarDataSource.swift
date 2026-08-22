@@ -56,14 +56,6 @@ enum WorkspaceBarDataSource {
                 iconResolver: iconResolver,
                 focusedToken: focusedToken,
                 settings: settings
-            ),
-            scratchpad: scratchpadItem(
-                options: options,
-                workspaceManager: workspaceManager,
-                appInfoCache: appInfoCache,
-                iconResolver: iconResolver,
-                focusedToken: focusedToken,
-                settings: settings
             )
         )
     }
@@ -170,43 +162,6 @@ enum WorkspaceBarDataSource {
             tiledEntries: tiledEntries,
             floatingEntries: floatingEntries,
             hasBarOccupancy: !tiledEntries.isEmpty || !floatingEntries.isEmpty
-        )
-    }
-
-    private static func scratchpadItem(
-        options: WorkspaceBarProjectionOptions,
-        workspaceManager: WorkspaceManager,
-        appInfoCache: AppInfoCache,
-        iconResolver: WorkspaceBarIconResolver,
-        focusedToken: WindowToken?,
-        settings: SettingsStore
-    ) -> WorkspaceBarScratchpadItem? {
-        guard let scratchpadToken = workspaceManager.scratchpadToken(),
-              let entry = workspaceManager.entry(for: scratchpadToken),
-              !isExcluded(entry, options: options, appInfoCache: appInfoCache),
-              let window = createWindowItems(
-                  entries: [entry],
-                  deduplicate: false,
-                  useLayoutOrder: false,
-                  appInfoCache: appInfoCache,
-                  iconResolver: iconResolver,
-                  focusedToken: focusedToken,
-                  hiddenAppPIDs: workspaceManager.hiddenAppPIDs,
-                  workspaceManager: workspaceManager
-              ).first
-        else {
-            return nil
-        }
-
-        let descriptor = workspaceManager.descriptor(for: entry.workspaceId)
-        let rawWorkspaceName = descriptor?.name ?? ""
-        return WorkspaceBarScratchpadItem(
-            window: window,
-            isVisible: workspaceManager.hiddenState(for: scratchpadToken) == nil
-                && !workspaceManager.isAppHidden(pid: entry.pid),
-            workspaceId: entry.workspaceId,
-            workspaceName: settings.displayName(for: rawWorkspaceName),
-            rawWorkspaceName: rawWorkspaceName
         )
     }
 

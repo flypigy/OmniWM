@@ -189,7 +189,7 @@ final class DurableParkTests: XCTestCase {
             ),
             historicalFrame
         )
-        for reason in [HiddenReason.workspaceInactive, .scratchpad] {
+        for reason in [HiddenReason.workspaceInactive] {
             XCTAssertNil(
                 LayoutDiffExecutor.frameBackedLayoutTransientRestoreFrame(
                     hiddenState: HiddenState(
@@ -263,10 +263,9 @@ final class DurableParkTests: XCTestCase {
         let hiddenState = HiddenState(
             proportionalPosition: .zero,
             referenceMonitorId: monitor.id,
-            reason: .scratchpad
+            reason: .workspaceInactive
         )
         let visibleFrame = CGRect(x: 100, y: 16, width: 800, height: 600)
-        controller.workspaceManager.setScratchpadToken(token)
         controller.workspaceManager.setHiddenState(hiddenState, for: token)
         let entry = try XCTUnwrap(controller.workspaceManager.entry(for: token))
         let transactionId = try XCTUnwrap(
@@ -523,15 +522,14 @@ final class DurableParkTests: XCTestCase {
         XCTAssertEqual(manager.pendingParkFrameRequest(for: windowId), targetRequest)
     }
 
-    func testWorkspaceInactiveAndScratchpadFloatingHidesRemainPendingWithoutAXConfirmation() throws {
+    func testWorkspaceInactiveFloatingHidesRemainPendingWithoutAXConfirmation() throws {
         let controller = Self.controller()
         let monitor = Self.monitor()
         controller.workspaceManager.applyMonitorConfigurationChange([monitor])
         let workspaceId = try XCTUnwrap(controller.workspaceManager.workspaceId(for: "1", createIfMissing: true))
         _ = controller.workspaceManager.focusWorkspace(named: "1")
         let cases: [(LayoutRefreshController.HideReason, HiddenReason)] = [
-            (.workspaceInactive, .workspaceInactive),
-            (.scratchpad, .scratchpad)
+            (.workspaceInactive, .workspaceInactive)
         ]
 
         for (index, testCase) in cases.enumerated() {
@@ -576,9 +574,7 @@ final class DurableParkTests: XCTestCase {
             expectedHiddenReason: HiddenReason?
         )] = [
             (.handsOffSurface, .workspaceInactive, nil),
-            (.full, .workspaceInactive, .workspaceInactive),
-            (.handsOffSurface, .scratchpad, nil),
-            (.full, .scratchpad, .scratchpad)
+            (.full, .workspaceInactive, .workspaceInactive)
         ]
 
         for (index, testCase) in cases.enumerated() {

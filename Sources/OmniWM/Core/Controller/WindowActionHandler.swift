@@ -403,20 +403,7 @@ final class WindowActionHandler {
     @discardableResult
     func navigateToExplicitlySelectedWindow(handle: WindowHandle) -> Bool {
         guard let controller else { return false }
-        let destination: AppRevealFocusDestination =
-            controller.workspaceManager.isScratchpadToken(handle.id)
-                || controller.workspaceManager.hiddenState(for: handle.id)?.isScratchpad == true
-                ? .scratchpad(monitorId: nil)
-                : .window
-        return requestAppRevealIfNeeded(handle: handle, destination: destination)
-    }
-
-    @discardableResult
-    func revealScratchpadFromBar(handle: WindowHandle, monitorId: Monitor.ID?) -> Bool {
-        requestAppRevealIfNeeded(
-            handle: handle,
-            destination: .scratchpad(monitorId: monitorId)
-        )
+        return requestAppRevealIfNeeded(handle: handle, destination: .window)
     }
 
     private func requestAppRevealIfNeeded(
@@ -457,8 +444,6 @@ final class WindowActionHandler {
             switch destination {
             case .window:
                 return navigateToWindowInternal(token: handle.id, workspaceId: entry.workspaceId)
-            case let .scratchpad(monitorId):
-                return controller.activateScratchpadFromBar(on: monitorId) == .executed
             }
         }
         guard entry.layoutReason == .standard
@@ -640,8 +625,6 @@ final class WindowActionHandler {
                 return finish(true)
             }
             return finish(navigateToWindowInternal(token: handle.id, workspaceId: payload.workspaceId))
-        case let .scratchpad(monitorId):
-            return finish(controller.activateScratchpadFromBar(on: monitorId) == .executed)
         }
     }
 

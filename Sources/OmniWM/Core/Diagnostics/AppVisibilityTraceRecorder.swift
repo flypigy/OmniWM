@@ -48,7 +48,6 @@ enum AppVisibilityTrace {
 
     enum Destination: String, Sendable {
         case window
-        case scratchpad
     }
 
     enum Reason: String, Sendable {

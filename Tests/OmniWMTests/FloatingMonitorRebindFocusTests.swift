@@ -518,7 +518,7 @@ final class FloatingMonitorRebindFocusTests: XCTestCase {
         XCTAssertEqual(manager.workspace(for: preseededTargetGeometry), fixture.targetWorkspaceId)
     }
 
-    func testInvalidHiddenAndScratchpadFramesDoNotRebindMembership() throws {
+    func testInvalidAndHiddenFramesDoNotRebindMembership() throws {
         let fixture = try makeFixture()
         let manager = fixture.controller.workspaceManager
         let invalid = addFloatingWindow(
@@ -530,12 +530,6 @@ final class FloatingMonitorRebindFocusTests: XCTestCase {
         let hidden = addFloatingWindow(
             pid: 489_006,
             windowId: 2,
-            to: fixture.sourceWorkspaceId,
-            controller: fixture.controller
-        )
-        let scratchpad = addFloatingWindow(
-            pid: 489_006,
-            windowId: 3,
             to: fixture.sourceWorkspaceId,
             controller: fixture.controller
         )
@@ -563,17 +557,6 @@ final class FloatingMonitorRebindFocusTests: XCTestCase {
         manager.setHiddenState(nil, for: hidden)
         rebind(hidden, fixture: fixture)
         XCTAssertEqual(manager.workspace(for: hidden), fixture.targetWorkspaceId)
-
-        XCTAssertTrue(manager.setScratchpadToken(scratchpad))
-        rebind(scratchpad, fixture: fixture)
-        XCTAssertEqual(manager.workspace(for: scratchpad), fixture.sourceWorkspaceId)
-        XCTAssertEqual(
-            manager.floatingState(for: scratchpad)?.referenceMonitorId,
-            fixture.targetMonitor.id
-        )
-        XCTAssertTrue(manager.setScratchpadToken(nil))
-        rebind(scratchpad, fixture: fixture)
-        XCTAssertEqual(manager.workspace(for: scratchpad), fixture.targetWorkspaceId)
     }
 
     func testReboundFloatingWindowRemainsCoherentAfterTargetMonitorRemoval() throws {

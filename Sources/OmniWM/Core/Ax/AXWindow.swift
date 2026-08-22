@@ -304,9 +304,9 @@ enum AXWindowService {
     }
 
     // Held AXUIElement references for windows that may be pruned from the
-    // app's kAXWindowsAttribute enumeration (e.g. scratchpad-hidden Calculator
-    // windows that drop out of the AX windows list while off-screen). Survives
-    // AppAXContext reconciliation because we hold the CFType ref directly.
+    // app's kAXWindowsAttribute enumeration (e.g. windows that drop out of the
+    // AX windows list while off-screen). Survives AppAXContext reconciliation
+    // because we hold the CFType ref directly.
     private static let pinnedElementsLock = NSLock()
     private nonisolated(unsafe) static var pinnedElements: [UInt32: AXUIElement] = [:]
 

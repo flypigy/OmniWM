@@ -109,20 +109,12 @@ extension WorkspaceManager {
         {
             return true
         }
-        if let scratchpadToken = scratchpadToken(),
-           let scratchpadEntry = entry(for: scratchpadToken),
-           scratchpadEntry.workspaceId == workspaceId,
-           scratchpadEntry.hiddenState == nil
-        {
-            return true
-        }
         guard transfersManagedFocus, let managedFocusedEntry else { return false }
         return visibleWorkspaces[sourceMonitorId] != workspaceId
             || interactionMonitorId != sourceMonitorId
             || isAppHidden(pid: managedFocusedEntry.pid)
             || managedFocusedEntry.layoutReason != .standard
             || managedFocusedEntry.hiddenState != nil
-            || scratchpadToken() == managedFocusedEntry.token
     }
 
     private func runtimeMonitorOverrideClearIsUnsafe(

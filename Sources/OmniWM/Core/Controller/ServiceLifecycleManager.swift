@@ -398,13 +398,6 @@ final class ServiceLifecycleManager {
         )
         controller.axEventHandler.cleanupFocusStateForTerminatedApp(pid: pid)
         let removedEntries = allEntries.filter { $0.pid == pid }
-        let scratchpadTokens = Set(removedEntries.compactMap { entry in
-            let token = entry.token
-            return controller.workspaceManager.isScratchpadToken(token)
-                || controller.workspaceManager.hiddenState(for: token)?.isScratchpad == true
-                ? token
-                : nil
-        })
         let affectedWorkspaces = controller.workspaceManager.removeWindowsForApp(pid: pid)
         if wasHidden {
             controller.axManager.setMacOSAppHidden(
@@ -417,9 +410,6 @@ final class ServiceLifecycleManager {
         for entry in removedEntries {
             controller.mouseEventHandler.discardNativeTitleBarDrag(for: entry.token)
             controller.axManager.removeWindowState(pid: entry.pid, expectedWindow: entry.axRef)
-            if scratchpadTokens.contains(entry.token) {
-                controller.cleanupScratchpadWindowResources(for: entry.token)
-            }
         }
         var focusValidationWorkspaces = affectedWorkspaces
         if let focusRecovery {

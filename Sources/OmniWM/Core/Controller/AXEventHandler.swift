@@ -2440,7 +2440,6 @@ final class AXEventHandler {
         guard let controller else { return false }
         guard entry.mode == .tiling else { return false }
         guard controller.workspaceManager.focusedToken == entry.token else { return false }
-        guard controller.workspaceManager.scratchpadToken() != entry.token else { return false }
         guard let descriptor = controller.workspaceManager.descriptor(for: entry.workspaceId) else { return false }
         guard controller.settings.layoutType(for: descriptor.name) != .dwindle else { return false }
         if entry.observedState.isNativeFullscreen {

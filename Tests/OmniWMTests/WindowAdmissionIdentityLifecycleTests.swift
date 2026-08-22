@@ -8,39 +8,6 @@ import XCTest
 
 @MainActor
 final class WindowAdmissionIdentityLifecycleTests: XCTestCase {
-    func testDuplicateCGSCreatePreservesPinnedHiddenScratchpad() throws {
-        let controller = WindowAdmissionTestSupport.controller()
-        let workspaceId = try XCTUnwrap(
-            controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
-        )
-        let windowId: UInt32 = 467_951
-        let pid: pid_t = 467_952
-        let element = AXUIElementCreateApplication(pid)
-        let token = controller.workspaceManager.addWindow(
-            AXWindowRef(element: element, windowId: Int(windowId)),
-            pid: pid,
-            windowId: Int(windowId),
-            to: workspaceId,
-            mode: .floating
-        )
-        XCTAssertTrue(controller.workspaceManager.setScratchpadToken(token))
-        controller.workspaceManager.setHiddenState(
-            HiddenState(
-                proportionalPosition: .zero,
-                referenceMonitorId: nil,
-                reason: .scratchpad
-            ),
-            for: token
-        )
-        AXWindowService.pinAXElement(element, for: windowId)
-        defer { AXWindowService.unpinAXElement(for: windowId) }
-
-        controller.axEventHandler.handleCGSEvent(.created(windowId: windowId, spaceId: 0))
-
-        XCTAssertTrue(AXWindowService.hasPinnedAXElement(for: windowId))
-        XCTAssertEqual(controller.workspaceManager.entry(forWindowId: Int(windowId))?.token, token)
-    }
-
     func testCanonicalObservationDoesNotMutateNiriState() throws {
         let controller = WindowAdmissionTestSupport.controller()
         controller.niriLayoutHandler.enableNiriLayout()

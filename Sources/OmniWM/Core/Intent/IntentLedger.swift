@@ -78,14 +78,11 @@ struct AppRevealFocusPayload: Equatable, Sendable {
 
 enum AppRevealFocusDestination: Equatable, Sendable {
     case window
-    case scratchpad(monitorId: Monitor.ID?)
 
     var traceDestination: AppVisibilityTrace.Destination {
         switch self {
         case .window:
             .window
-        case .scratchpad:
-            .scratchpad
         }
     }
 }

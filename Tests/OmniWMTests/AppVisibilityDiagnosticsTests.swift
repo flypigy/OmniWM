@@ -20,7 +20,7 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
         let hiddenState = HiddenState(
             proportionalPosition: CGPoint(x: 0.5, y: 0.5),
             referenceMonitorId: nil,
-            reason: .scratchpad
+            reason: .workspaceInactive
         )
         controller.workspaceManager.setHiddenState(hiddenState, for: token)
         controller.workspaceManager.setLayoutReason(.nativeFullscreen, for: token)
@@ -45,7 +45,7 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
                 interactionMonitorId: nil,
                 activeWorkspaceIdsByMonitor: [:]
             ),
-            destination: .scratchpad(monitorId: nil)
+            destination: .window
         )
         defer {
             controller.axManager.setMacOSAppHidden(
@@ -62,8 +62,8 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
         XCTAssertTrue(report.contains("axManagerHidden=true appAXHidden=true"))
         XCTAssertTrue(report.contains("windows=1 workspaces=1 activeWorkspaces=1"))
         XCTAssertTrue(report.contains("pendingReveal=id:\(reveal.id),win:\(token.windowId)"))
-        XCTAssertTrue(report.contains("destination:scratchpad"))
-        XCTAssertTrue(report.contains("hidden=scratchpad layout=nativeFullscreen"))
+        XCTAssertTrue(report.contains("destination:window"))
+        XCTAssertTrue(report.contains("hidden=workspace-inactive layout=nativeFullscreen"))
         XCTAssertTrue(report.contains("sync=unverified-os"))
         XCTAssertTrue(report.contains("projection workspace=\(workspaceId.uuidString) expectedExcluded=1"))
         XCTAssertTrue(report.contains("niri=excluded:1,missing:0,unexpected:0,match:true"), report)

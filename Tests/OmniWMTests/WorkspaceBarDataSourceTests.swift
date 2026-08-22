@@ -215,34 +215,6 @@ final class WorkspaceBarDataSourceTests: XCTestCase {
         XCTAssertFalse(projection.items.contains { $0.id == idleId })
     }
 
-    func testExcludedScratchpadSuppressesOnlyItsBarPill() throws {
-        let fixture = try makeFixture()
-        let token = addWindow(
-            pid: 45_001,
-            windowId: 45_101,
-            bundleId: "com.example.scratchpad",
-            mode: .floating,
-            to: fixture
-        )
-        XCTAssertTrue(fixture.workspaceManager.setScratchpadToken(token))
-
-        let unfiltered = project(
-            fixture,
-            showFloatingWindows: true,
-            excludedBundleIDs: []
-        )
-        XCTAssertEqual(unfiltered.scratchpad?.id, token)
-
-        let filtered = project(
-            fixture,
-            showFloatingWindows: true,
-            excludedBundleIDs: ["COM.EXAMPLE.SCRATCHPAD"]
-        )
-        XCTAssertNil(filtered.scratchpad)
-        XCTAssertEqual(fixture.workspaceManager.scratchpadToken(), token)
-        XCTAssertEqual(fixture.workspaceManager.entry(for: token)?.mode, .floating)
-    }
-
     func testWorkspaceBarIPCUsesFilteredProjectionWhileWindowsQueryRetainsEntry() throws {
         let settings = makeSettingsStore()
         XCTAssertTrue(settings.addWorkspaceBarExcludedBundleID("com.example.ipc"))
@@ -491,7 +463,7 @@ final class WorkspaceBarDataSourceTests: XCTestCase {
         XCTAssertTrue(item.allWindows[1].handle === fixture.workspaceManager.handle(for: hidden))
     }
 
-    func testOverrideAppliesToTiledFloatingAndScratchpadItems() throws {
+    func testOverrideAppliesToTiledAndFloatingItems() throws {
         let overrideImage = NSImage(size: NSSize(width: 32, height: 32))
         let fixture = try makeFixture { _ in overrideImage }
         let tiled = addWindow(
@@ -508,14 +480,6 @@ final class WorkspaceBarDataSourceTests: XCTestCase {
             mode: .floating,
             to: fixture
         )
-        let scratchpad = addWindow(
-            pid: 50_003,
-            windowId: 50_103,
-            bundleId: "com.example.override",
-            mode: .floating,
-            to: fixture
-        )
-        XCTAssertTrue(fixture.workspaceManager.setScratchpadToken(scratchpad))
         fixture.iconResolver.synchronize(
             overrides: ["com.example.override": "icons/custom.png"]
         )
@@ -528,11 +492,9 @@ final class WorkspaceBarDataSourceTests: XCTestCase {
         let item = try XCTUnwrap(projection.items.first { $0.id == fixture.workspaceId })
         let tiledItem = try XCTUnwrap(item.tiledWindows.first { $0.id == tiled })
         let floatingItem = try XCTUnwrap(item.floatingWindows.first { $0.id == floating })
-        let scratchpadItem = try XCTUnwrap(projection.scratchpad)
 
         XCTAssertTrue(tiledItem.icon === overrideImage)
         XCTAssertTrue(floatingItem.icon === overrideImage)
-        XCTAssertTrue(scratchpadItem.window.icon === overrideImage)
     }
 
     private func project(

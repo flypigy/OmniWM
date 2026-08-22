@@ -212,7 +212,7 @@ final class WorkspaceBarViewLayoutTests: XCTestCase {
                 floatingWindows: []
             )
             let snapshot = WorkspaceBarSnapshot(
-                projection: WorkspaceBarProjection(items: [item], scratchpad: nil),
+                projection: WorkspaceBarProjection(items: [item]),
                 showLabels: true,
                 showSystemStatsButton: false,
                 backgroundOpacity: 0.6,
@@ -229,8 +229,7 @@ final class WorkspaceBarViewLayoutTests: XCTestCase {
                         model: WorkspaceBarModel(snapshot: snapshot),
                         motionPolicy: MotionPolicy(animationsEnabled: false),
                         onFocusWorkspace: { _ in },
-                        onFocusWindow: { _ in },
-                        onActivateScratchpad: {}
+                        onFocusWindow: { _ in }
                     )
                 }
             )
@@ -293,7 +292,7 @@ final class WorkspaceBarViewLayoutTests: XCTestCase {
             floatingWindows: []
         )
         return WorkspaceBarSnapshot(
-            projection: WorkspaceBarProjection(items: [item], scratchpad: nil),
+            projection: WorkspaceBarProjection(items: [item]),
             showLabels: true,
             showSystemStatsButton: false,
             backgroundOpacity: 0.6,

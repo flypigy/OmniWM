@@ -432,57 +432,6 @@ final class MacOSHiddenAppTests: XCTestCase {
         XCTAssertNil(controller.layoutRefreshController.layoutState.closingAnimationsByDisplay[monitor.displayId])
     }
 
-    func testHideCancelsDelayedScratchpadRevealWithoutClearingHiddenState() throws {
-        let controller = makeController()
-        let workspaceId = try XCTUnwrap(
-            controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
-        )
-        let token = addWindow(pid: 880_025, windowId: 880_125, to: workspaceId, controller: controller)
-        XCTAssertTrue(controller.workspaceManager.setWindowMode(.floating, for: token))
-        let hiddenState = HiddenState(
-            proportionalPosition: .zero,
-            referenceMonitorId: nil,
-            reason: .scratchpad
-        )
-        controller.workspaceManager.setScratchpadToken(token)
-        controller.workspaceManager.setHiddenState(hiddenState, for: token)
-        let entry = try XCTUnwrap(controller.workspaceManager.entry(for: token))
-        let targetFrame = CGRect(x: 40, y: 40, width: 400, height: 300)
-        let transactionId = try XCTUnwrap(
-            controller.layoutRefreshController.beginPendingRevealTransaction(
-                for: entry,
-                hiddenState: hiddenState,
-                targetFrame: targetFrame,
-                monitor: controller.workspaceManager.monitor(for: workspaceId) ?? Monitor.fallback()
-            )
-        )
-        controller.layoutRefreshController.completePendingRevealTransaction(
-            with: AXFrameApplyResult(
-                requestId: 1,
-                pid: token.pid,
-                windowId: token.windowId,
-                expectedWindow: entry.axRef,
-                targetFrame: targetFrame,
-                currentFrameHint: nil,
-                writeResult: AXFrameWriteResult(
-                    targetFrame: targetFrame,
-                    observedFrame: nil,
-                    writeOrder: .sizeThenPosition,
-                    sizeError: .success,
-                    positionError: .success,
-                    failureReason: .verificationMismatch
-                )
-            ),
-            transactionId: transactionId
-        )
-        XCTAssertTrue(controller.layoutRefreshController.hasPendingRevealTransaction(for: token.windowId))
-
-        controller.axEventHandler.handleAppHidden(pid: token.pid)
-
-        XCTAssertFalse(controller.layoutRefreshController.hasPendingRevealTransaction(for: token.windowId))
-        XCTAssertEqual(controller.workspaceManager.hiddenState(for: token), hiddenState)
-    }
-
     func testRealLayoutPlanIsRejectedAfterVisibilityTransition() throws {
         let controller = makeController()
         let workspaceId = try XCTUnwrap(controller.workspaceManager.workspaceId(for: "1", createIfMissing: true))

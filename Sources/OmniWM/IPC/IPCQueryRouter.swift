@@ -51,7 +51,6 @@ final class IPCQueryRouter {
                 showLabels: resolved.showLabels,
                 backgroundOpacity: resolved.backgroundOpacity,
                 barHeight: Double(geometry.barHeight),
-                scratchpad: projection.scratchpad.map(workspaceBarScratchpad(from:)),
                 workspaces: projection.items.map(workspaceBarWorkspace(from:))
             )
         }
@@ -279,13 +278,6 @@ final class IPCQueryRouter {
         )
     }
 
-    private func workspaceBarScratchpad(from item: WorkspaceBarScratchpadItem) -> IPCWorkspaceBarScratchpad {
-        IPCWorkspaceBarScratchpad(
-            window: workspaceBarApp(from: item.window),
-            isVisible: item.isVisible
-        )
-    }
-
     private func windowSnapshot(
         from entry: WindowState,
         focusedToken: WindowToken?,
@@ -297,7 +289,6 @@ final class IPCQueryRouter {
         let appInfo = controller.appInfoCache.info(for: entry.pid)
         let hiddenState = controller.workspaceManager.hiddenState(for: entry.token)
         let isAppHidden = controller.workspaceManager.isAppHidden(pid: entry.pid)
-        let isScratchpad = controller.workspaceManager.isScratchpadToken(entry.token)
         let isVisible = isWindowVisible(
             entry,
             visibleWorkspaceIds: visibleWorkspaceIds,
@@ -322,7 +313,6 @@ final class IPCQueryRouter {
             isFocused: include("is-focused", in: fields) ? (entry.token == focusedToken) : nil,
             isVisible: include("is-visible", in: fields) ? isVisible : nil,
             isAppHidden: include("is-app-hidden", in: fields) ? isAppHidden : nil,
-            isScratchpad: include("is-scratchpad", in: fields) ? isScratchpad : nil,
             hiddenReason: include("hidden-reason", in: fields) ? hiddenState.map(ipcHiddenReason(from:)) : nil
         )
     }
@@ -338,12 +328,10 @@ final class IPCQueryRouter {
         let monitor = controller.workspaceManager.monitor(for: descriptor.id)
         let entries = controller.workspaceManager.entries(in: descriptor.id)
         let floatingCount = entries.filter { $0.mode == .floating }.count
-        let scratchpadCount = entries.filter { controller.workspaceManager.isScratchpadToken($0.token) }.count
         let counts = IPCWorkspaceWindowCounts(
             total: entries.count,
             tiled: entries.filter { $0.mode == .tiling }.count,
-            floating: floatingCount,
-            scratchpad: scratchpadCount
+            floating: floatingCount
         )
         let focusedWindowId = focusedWindowToken
             .flatMap { controller.workspaceManager.entry(for: $0) }
@@ -443,10 +431,6 @@ final class IPCQueryRouter {
         }
 
         if selectors.floating == true, entry.mode != .floating {
-            return false
-        }
-
-        if selectors.scratchpad == true, !controller.workspaceManager.isScratchpadToken(entry.token) {
             return false
         }
 
@@ -693,8 +677,6 @@ final class IPCQueryRouter {
             .workspaceInactive
         case .layoutTransient:
             .layoutTransient
-        case .scratchpad:
-            .scratchpad
         }
     }
 

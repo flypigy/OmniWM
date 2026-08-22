@@ -298,7 +298,6 @@ actor IPCApplicationBridge {
         if let focused = query.selectors.focused, focused != true { return .invalidArguments }
         if let visible = query.selectors.visible, visible != true { return .invalidArguments }
         if let floating = query.selectors.floating, floating != true { return .invalidArguments }
-        if let scratchpad = query.selectors.scratchpad, scratchpad != true { return .invalidArguments }
         if let current = query.selectors.current, current != true { return .invalidArguments }
         if let main = query.selectors.main, main != true { return .invalidArguments }
 

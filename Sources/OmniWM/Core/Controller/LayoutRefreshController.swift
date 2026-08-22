@@ -129,7 +129,6 @@ import QuartzCore
     enum HideReason {
         case workspaceInactive
         case layoutTransient
-        case scratchpad
     }
 
     private enum HiddenRevealOperation {
@@ -1914,11 +1913,6 @@ import QuartzCore
                 seenKeys.insert(.init(pid: entry.pid, windowId: entry.windowId))
             }
 
-            preserveScratchpadHiddenWindowsDuringFullRescan(
-                trackedEntries,
-                windowServerInfoByWindowId: enumerationSnapshot.windowServerInfoByWindowId,
-                seenKeys: &seenKeys
-            )
         }
 
         preserveFocusedSheetDuringFullRescan(
@@ -2105,108 +2099,6 @@ import QuartzCore
         )
     }
 
-    private enum ScratchpadRescanEvidence {
-        case visibleFrame
-        case windowServer
-        case pinnedAX
-    }
-
-    private struct ScratchpadRescanObservation {
-        let evidence: ScratchpadRescanEvidence
-        let visibleFrame: CGRect?
-    }
-
-    func preserveScratchpadHiddenWindowsDuringFullRescan(
-        _ entries: [WindowState],
-        windowServerInfoByWindowId: [Int: WindowServerInfo],
-        seenKeys: inout Set<WindowToken>,
-        hasPinnedAXElement: (UInt32) -> Bool = { AXWindowService.hasPinnedAXElement(for: $0) }
-    ) {
-        guard let controller else { return }
-        for entry in entries where controller.workspaceManager.hiddenState(for: entry.token)?.isScratchpad == true {
-            if controller.workspaceManager.isAppHidden(pid: entry.pid) {
-                seenKeys.insert(entry.token)
-                continue
-            }
-            let observation = scratchpadRescanObservation(
-                for: entry,
-                windowServerInfo: windowServerInfoByWindowId[entry.windowId],
-                hasPinnedAXElement: hasPinnedAXElement
-            )
-            switch observation?.evidence {
-            case .visibleFrame:
-                if pendingRevealTransactionsByWindowId[entry.windowId]?.token == entry.token,
-                   let visibleFrame = observation?.visibleFrame
-                {
-                    finalizePendingRevealTransactionSuccess(
-                        forWindowId: entry.windowId,
-                        confirmedFrame: visibleFrame
-                    )
-                } else {
-                    cancelPendingScratchpadReveal(for: entry.token)
-                    if controller.axManager.pendingParkWindowIds.contains(entry.windowId),
-                       let visibleFrame = observation?.visibleFrame
-                    {
-                        applyPositionPlans([
-                            WindowPositionPlan(entry: entry, frame: visibleFrame)
-                        ])
-                    }
-                    controller.workspaceManager.setHiddenState(nil, for: entry.token)
-                    controller.axManager.unsuppressFrameWrites([(entry.pid, entry.windowId)])
-                }
-                seenKeys.insert(entry.token)
-            case .windowServer,
-                 .pinnedAX:
-                seenKeys.insert(entry.token)
-            case nil:
-                break
-            }
-        }
-    }
-
-    private func scratchpadRescanObservation(
-        for entry: WindowState,
-        windowServerInfo: WindowServerInfo?,
-        hasPinnedAXElement: (UInt32) -> Bool
-    ) -> ScratchpadRescanObservation? {
-        guard controller != nil else { return nil }
-        guard let windowId = UInt32(exactly: entry.windowId) else { return nil }
-
-        if let windowInfo = windowServerInfo {
-            guard windowInfo.pid == entry.pid else { return nil }
-            if let visibleFrame = scratchpadVisibleWindowServerFrame(windowInfo.frame, for: entry) {
-                return ScratchpadRescanObservation(evidence: .visibleFrame, visibleFrame: visibleFrame)
-            }
-            return ScratchpadRescanObservation(evidence: .windowServer, visibleFrame: nil)
-        }
-
-        if hasPinnedAXElement(windowId) {
-            return ScratchpadRescanObservation(evidence: .pinnedAX, visibleFrame: nil)
-        }
-
-        return nil
-    }
-
-    private func scratchpadVisibleWindowServerFrame(_ frame: CGRect, for entry: WindowState) -> CGRect? {
-        if scratchpadFrameIsVisible(frame, for: entry) {
-            return frame
-        }
-        let appKitFrame = ScreenCoordinateSpace.toAppKit(rect: frame)
-        return scratchpadFrameIsVisible(appKitFrame, for: entry) ? appKitFrame : nil
-    }
-
-    private func scratchpadFrameIsVisible(_ frame: CGRect, for entry: WindowState) -> Bool {
-        guard let controller else { return false }
-        if let floatingFrame = controller.workspaceManager.floatingState(for: entry.token)?.lastFrame,
-           frame.approximatelyEqual(to: floatingFrame, tolerance: FrameTolerance.screenMatch)
-        {
-            return true
-        }
-        return controller.workspaceManager.monitors.contains { monitor in
-            frame.intersects(monitor.visibleFrame)
-                && monitor.visibleFrame.contains(CGPoint(x: frame.midX, y: frame.midY))
-        }
-    }
 
     private func partitionWorkspacesByLayoutType(
         _ workspaces: Set<WorkspaceDescriptor.ID>
@@ -2949,10 +2841,6 @@ import QuartzCore
         existingState: HiddenState?,
         preserveWorkspaceInactive: Bool
     ) -> HiddenReason {
-        if existingState?.isScratchpad == true, reason != .scratchpad {
-            return .scratchpad
-        }
-
         if preserveWorkspaceInactive,
            existingState?.workspaceInactive == true,
            reason == .layoutTransient
@@ -2965,8 +2853,6 @@ import QuartzCore
             return .workspaceInactive
         case .layoutTransient:
             return .layoutTransient(side)
-        case .scratchpad:
-            return .scratchpad
         }
     }
 
@@ -3071,8 +2957,7 @@ import QuartzCore
             ?? controller.workspaceManager.monitors.map(HiddenPlacementMonitorContext.init)
 
         switch reason {
-        case .workspaceInactive,
-             .scratchpad:
+        case .workspaceInactive:
             return HiddenWindowPlacementResolver.physicalScreenEdgeOrigin(
                 for: frame.size,
                 requestedSide: side,
@@ -3120,27 +3005,6 @@ import QuartzCore
             return true
         }
         guard hiddenState.workspaceInactive else { return false }
-
-        return executeHiddenReveal(
-            entry,
-            monitor: monitor,
-            hiddenState: hiddenState,
-            onSuccess: onSuccess
-        )
-    }
-
-    @discardableResult
-    func restoreScratchpadWindow(
-        _ entry: WindowState,
-        monitor: Monitor,
-        onSuccess: PostLayoutAction? = nil
-    ) -> Bool {
-        guard let controller,
-              let hiddenState = controller.workspaceManager.hiddenState(for: entry.token),
-              hiddenState.isScratchpad
-        else {
-            return false
-        }
 
         return executeHiddenReveal(
             entry,
@@ -3235,7 +3099,7 @@ import QuartzCore
                 onSuccess,
                 workspaceIds: [entry.workspaceId]
             ) {
-                if !pendingTransaction.hiddenState.isScratchpad || pendingTransaction.postSuccessActions.isEmpty {
+                if pendingTransaction.postSuccessActions.isEmpty {
                     pendingTransaction.postSuccessActions.append(onSuccess)
                     pendingRevealTransactionsByWindowId[entry.windowId] = pendingTransaction
                 }
@@ -3306,18 +3170,6 @@ import QuartzCore
         pendingRevealTransactionsByWindowId[windowId] = transaction
     }
 
-    func cancelPendingScratchpadReveal(for token: WindowToken) {
-        guard let transaction = pendingRevealTransactionsByWindowId[token.windowId],
-              transaction.token == token,
-              transaction.hiddenState.isScratchpad
-        else {
-            return
-        }
-        pendingRevealTransactionsByWindowId.removeValue(forKey: token.windowId)
-        pendingRevealVerificationTasksByWindowId.removeValue(forKey: token.windowId)?.cancel()
-        controller?.axManager.cancelPendingFrameJobs([(transaction.pid, transaction.windowId)])
-    }
-
     func completePendingRevealTransaction(
         with result: AXFrameApplyResult,
         transactionId: UInt64
@@ -3364,9 +3216,6 @@ import QuartzCore
             }
             if isConfirmedRevealFailureTerminal(failureReason) {
                 return .failure
-            }
-            if transaction.hiddenState.isScratchpad {
-                return .delayedVerification
             }
             return .success
         }
@@ -3420,9 +3269,6 @@ import QuartzCore
             controller.workspaceManager.setHiddenState(nil, for: pendingTransaction.token)
         }
         controller.axManager.clearParkPending(for: pendingTransaction.windowId, pid: pendingTransaction.pid)
-        if pendingTransaction.hiddenState.isScratchpad {
-            controller.requestWorkspaceBarRefresh()
-        }
         if let confirmedFrame {
             controller.axManager.confirmFrameWrite(for: pendingTransaction.windowId, frame: confirmedFrame)
         }
@@ -3461,13 +3307,6 @@ import QuartzCore
                 reason: .staleLayoutPlan,
                 affectedWorkspaceIds: stalePendingRevealWorkspaceIds(pendingTransaction, using: controller)
             )
-            return
-        }
-
-        if pendingTransaction.hiddenState.isScratchpad,
-           controller.workspaceManager.hiddenState(for: pendingTransaction.token)?.isScratchpad != true
-        {
-            controller.axManager.unsuppressFrameWrites(frameEntry)
             return
         }
 
@@ -3558,8 +3397,6 @@ import QuartzCore
             .workspaceInactive
         case .layoutTransient:
             .layoutTransient
-        case .scratchpad:
-            .scratchpad
         }
     }
 
@@ -3644,9 +3481,6 @@ import QuartzCore
                 controller.withRuntimeFrameJobCancellationSuppressed {
                     controller.workspaceManager.setHiddenState(nil, for: entry.token)
                 }
-                if hiddenState.isScratchpad {
-                    controller.requestWorkspaceBarRefresh()
-                }
                 controller.axManager.unsuppressFrameWrites(frameEntry)
                 acceptedPostLayoutAction(
                     onSuccess,
@@ -3662,9 +3496,6 @@ import QuartzCore
             controller.withRuntimeFrameJobCancellationSuppressed {
                 controller.workspaceManager.setHiddenState(nil, for: entry.token)
             }
-            if hiddenState.isScratchpad {
-                controller.requestWorkspaceBarRefresh()
-            }
             controller.axManager.unsuppressFrameWrites(frameEntry)
             acceptedPostLayoutAction(
                 onSuccess,
@@ -3675,9 +3506,6 @@ import QuartzCore
             if !shouldUsePendingRevealTransaction(for: entry, hiddenState: hiddenState) {
                 controller.withRuntimeFrameJobCancellationSuppressed {
                     controller.workspaceManager.setHiddenState(nil, for: entry.token)
-                }
-                if hiddenState.isScratchpad {
-                    controller.requestWorkspaceBarRefresh()
                 }
                 controller.axManager.unsuppressFrameWrites(frameEntry)
                 controller.axManager.forceApplyNextFrame(for: entry.windowId)

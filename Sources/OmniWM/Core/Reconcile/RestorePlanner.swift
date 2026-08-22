@@ -72,7 +72,6 @@ struct RestorePlanner {
         let targetMonitor: Monitor
         let currentFrame: CGRect?
         let targetFrame: CGRect
-        let isScratchpadHidden: Bool
         let isWorkspaceInactiveHidden: Bool
     }
 
@@ -129,7 +128,6 @@ struct RestorePlanner {
              .niriPlacementsResolved,
              .nonManagedFocusChanged,
              .nonManagedFocusTargetChanged,
-             .scratchpadChanged,
              .selectionChanged,
              .spaceTopologyChanged,
              .suppressedFocusChanged,
@@ -453,8 +451,6 @@ struct RestorePlanner {
         var plan = FloatingRescuePlan()
 
         for candidate in candidates {
-            guard !candidate.isScratchpadHidden else { continue }
-
             let needsRescue = candidate.currentFrame.map {
                 candidate.isWorkspaceInactiveHidden || !$0.approximatelyEqual(
                     to: candidate.targetFrame,

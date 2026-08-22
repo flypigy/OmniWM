@@ -16,7 +16,6 @@ public enum IPCQuerySelectorName: String, Codable, CaseIterable, Equatable, Hash
     case focused
     case visible
     case floating
-    case scratchpad
     case app
     case bundleId = "bundle-id"
     case current
@@ -37,7 +36,6 @@ public enum IPCQuerySelectorName: String, Codable, CaseIterable, Equatable, Hash
         case .focused,
              .visible,
              .floating,
-             .scratchpad,
              .current,
              .main:
             false
@@ -315,7 +313,6 @@ public enum IPCAutomationManifest {
         "is-focused",
         "is-visible",
         "is-app-hidden",
-        "is-scratchpad",
         "hidden-reason"
     ]
 
@@ -384,7 +381,6 @@ public enum IPCAutomationManifest {
                     summary: "Only include windows on visible workspaces that are neither hidden nor owned by a hidden app."
                 ),
                 .init(name: .floating, summary: "Only include floating managed windows."),
-                .init(name: .scratchpad, summary: "Only include the scratchpad window."),
                 .init(name: .app, summary: "Filter by application display name."),
                 .init(name: .bundleId, summary: "Filter by application bundle identifier.")
             ],
@@ -848,12 +844,6 @@ public enum IPCAutomationManifest {
             name: .toggleFocusedWindowFloating,
             summary: "Toggle the focused managed window between tiled and floating."
         ),
-        command(
-            ["scratchpad", "assign"],
-            name: .scratchpadAssign,
-            summary: "Assign the focused managed window to the scratchpad."
-        ),
-        command(["scratchpad", "toggle"], name: .scratchpadToggle, summary: "Show or hide the scratchpad window."),
         command(["open-menu-anywhere"], name: .openMenuAnywhere, summary: "Open the menu surface anywhere."),
         command(
             ["toggle-workspace-bar"],

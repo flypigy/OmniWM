@@ -125,7 +125,6 @@ public enum IPCWorkspaceLayout: String, Codable, Equatable, Sendable {
 public enum IPCHiddenReason: String, Codable, Equatable, Sendable {
     case workspaceInactive = "workspace-inactive"
     case layoutTransient = "layout-transient"
-    case scratchpad
 }
 
 public enum IPCLayoutReason: String, Codable, Equatable, Sendable {
@@ -194,13 +193,11 @@ public struct IPCWorkspaceWindowCounts: Codable, Equatable, Sendable {
     public let total: Int
     public let tiled: Int
     public let floating: Int
-    public let scratchpad: Int
 
-    public init(total: Int, tiled: Int, floating: Int, scratchpad: Int) {
+    public init(total: Int, tiled: Int, floating: Int) {
         self.total = total
         self.tiled = tiled
         self.floating = floating
-        self.scratchpad = scratchpad
     }
 }
 
@@ -284,8 +281,6 @@ public enum IPCCommandName: String, Codable, CaseIterable, Equatable, Sendable {
     case toggleWorkspaceBar = "toggle-workspace-bar"
     case hiddenBarPanel = "hidden-bar-panel"
     case toggleFocusedWindowFloating = "toggle-focused-window-floating"
-    case scratchpadAssign = "scratchpad-assign"
-    case scratchpadToggle = "scratchpad-toggle"
     case openMenuAnywhere = "open-menu-anywhere"
 }
 
@@ -416,8 +411,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
     case toggleWorkspaceBar
     case hiddenBarPanel
     case toggleFocusedWindowFloating
-    case scratchpadAssign
-    case scratchpadToggle
     case openMenuAnywhere
 
     public var name: IPCCommandName {
@@ -580,10 +573,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
             .hiddenBarPanel
         case .toggleFocusedWindowFloating:
             .toggleFocusedWindowFloating
-        case .scratchpadAssign:
-            .scratchpadAssign
-        case .scratchpadToggle:
-            .scratchpadToggle
         case .openMenuAnywhere:
             .openMenuAnywhere
         }
@@ -874,12 +863,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
         case .toggleFocusedWindowFloating:
             try requireNoArguments()
             self = .toggleFocusedWindowFloating
-        case .scratchpadAssign:
-            try requireNoArguments()
-            self = .scratchpadAssign
-        case .scratchpadToggle:
-            try requireNoArguments()
-            self = .scratchpadToggle
         case .openMenuAnywhere:
             try requireNoArguments()
             self = .openMenuAnywhere
@@ -1114,10 +1097,6 @@ extension IPCCommandRequest: Codable {
             self = .hiddenBarPanel
         case .toggleFocusedWindowFloating:
             self = .toggleFocusedWindowFloating
-        case .scratchpadAssign:
-            self = .scratchpadAssign
-        case .scratchpadToggle:
-            self = .scratchpadToggle
         case .openMenuAnywhere:
             self = .openMenuAnywhere
         }
@@ -1292,10 +1271,6 @@ extension IPCCommandRequest: Codable {
             break
         case .toggleFocusedWindowFloating:
             break
-        case .scratchpadAssign:
-            break
-        case .scratchpadToggle:
-            break
         case .openMenuAnywhere:
             break
         }
@@ -1326,7 +1301,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
     public let focused: Bool?
     public let visible: Bool?
     public let floating: Bool?
-    public let scratchpad: Bool?
     public let app: String?
     public let bundleId: String?
     public let current: Bool?
@@ -1339,7 +1313,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
         focused: Bool? = nil,
         visible: Bool? = nil,
         floating: Bool? = nil,
-        scratchpad: Bool? = nil,
         app: String? = nil,
         bundleId: String? = nil,
         current: Bool? = nil,
@@ -1351,7 +1324,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
         self.focused = focused
         self.visible = visible
         self.floating = floating
-        self.scratchpad = scratchpad
         self.app = app
         self.bundleId = bundleId
         self.current = current
@@ -1366,7 +1338,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
         if focused != nil { names.append(.focused) }
         if visible != nil { names.append(.visible) }
         if floating != nil { names.append(.floating) }
-        if scratchpad != nil { names.append(.scratchpad) }
         if app != nil { names.append(.app) }
         if bundleId != nil { names.append(.bundleId) }
         if current != nil { names.append(.current) }
@@ -1384,7 +1355,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -1398,7 +1368,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -1412,7 +1381,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -1426,7 +1394,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: true,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -1440,7 +1407,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: true,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -1454,21 +1420,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: true,
-                scratchpad: scratchpad,
-                app: app,
-                bundleId: bundleId,
-                current: current,
-                main: main
-            )
-        case .scratchpad:
-            IPCQuerySelectors(
-                window: window,
-                workspace: workspace,
-                display: display,
-                focused: focused,
-                visible: visible,
-                floating: floating,
-                scratchpad: true,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -1482,7 +1433,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: value,
                 bundleId: bundleId,
                 current: current,
@@ -1496,7 +1446,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: value,
                 current: current,
@@ -1510,7 +1459,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: true,
@@ -1524,7 +1472,6 @@ public struct IPCQuerySelectors: Codable, Equatable, Sendable {
                 focused: focused,
                 visible: visible,
                 floating: floating,
-                scratchpad: scratchpad,
                 app: app,
                 bundleId: bundleId,
                 current: current,
@@ -2086,16 +2033,6 @@ public struct IPCWorkspaceBarApp: Codable, Equatable, Sendable {
     }
 }
 
-public struct IPCWorkspaceBarScratchpad: Codable, Equatable, Sendable {
-    public let window: IPCWorkspaceBarApp
-    public let isVisible: Bool
-
-    public init(window: IPCWorkspaceBarApp, isVisible: Bool) {
-        self.window = window
-        self.isVisible = isVisible
-    }
-}
-
 public struct IPCWorkspaceBarWorkspace: Codable, Equatable, Sendable {
     public let id: String
     public let rawName: String
@@ -2129,7 +2066,6 @@ public struct IPCWorkspaceBarMonitor: Codable, Equatable, Sendable {
     public let showLabels: Bool
     public let backgroundOpacity: Double
     public let barHeight: Double
-    public let scratchpad: IPCWorkspaceBarScratchpad?
     public let workspaces: [IPCWorkspaceBarWorkspace]
 
     public init(
@@ -2140,7 +2076,6 @@ public struct IPCWorkspaceBarMonitor: Codable, Equatable, Sendable {
         showLabels: Bool,
         backgroundOpacity: Double,
         barHeight: Double,
-        scratchpad: IPCWorkspaceBarScratchpad?,
         workspaces: [IPCWorkspaceBarWorkspace]
     ) {
         self.id = id
@@ -2150,7 +2085,6 @@ public struct IPCWorkspaceBarMonitor: Codable, Equatable, Sendable {
         self.showLabels = showLabels
         self.backgroundOpacity = backgroundOpacity
         self.barHeight = barHeight
-        self.scratchpad = scratchpad
         self.workspaces = workspaces
     }
 }
@@ -2257,7 +2191,6 @@ public struct IPCWindowQuerySnapshot: Codable, Equatable, Sendable {
     public let isFocused: Bool?
     public let isVisible: Bool?
     public let isAppHidden: Bool?
-    public let isScratchpad: Bool?
     public let hiddenReason: IPCHiddenReason?
 
     public init(
@@ -2274,7 +2207,6 @@ public struct IPCWindowQuerySnapshot: Codable, Equatable, Sendable {
         isFocused: Bool? = nil,
         isVisible: Bool? = nil,
         isAppHidden: Bool? = nil,
-        isScratchpad: Bool? = nil,
         hiddenReason: IPCHiddenReason? = nil
     ) {
         self.id = id
@@ -2290,7 +2222,6 @@ public struct IPCWindowQuerySnapshot: Codable, Equatable, Sendable {
         self.isFocused = isFocused
         self.isVisible = isVisible
         self.isAppHidden = isAppHidden
-        self.isScratchpad = isScratchpad
         self.hiddenReason = hiddenReason
     }
 }

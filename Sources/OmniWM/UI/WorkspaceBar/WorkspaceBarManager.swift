@@ -319,9 +319,6 @@ final class WorkspaceBarManager {
             onFocusWindow: { [weak controller] handle in
                 controller?.focusWindowFromBar(handle: handle)
             },
-            onActivateScratchpad: { [weak controller] in
-                controller?.activateScratchpadFromBar(on: monitorId)
-            },
             onToggleSystemStats: { [weak controller] in
                 controller?.toggleSystemStatsFromBar(on: monitorId)
             },
@@ -468,7 +465,6 @@ final class WorkspaceBarManager {
             return nil
         }
         let hasSecondaryContent = !WorkspaceBarIslandSlice.secondary.items(in: snapshot).isEmpty
-            || WorkspaceBarIslandSlice.secondary.scratchpad(in: snapshot) != nil
         let activeShowsSystemStatsButton = snapshot.showSystemStatsButton && !hasSecondaryContent
         let secondaryShowsSystemStatsButton = snapshot.showSystemStatsButton && hasSecondaryContent
         guard let layout = geometry.splitFrame(

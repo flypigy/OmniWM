@@ -830,52 +830,6 @@ final class WMController {
         systemStatsPopupController.dismissIfAnchored(to: monitorId)
     }
 
-    @discardableResult
-    func activateScratchpadFromBar(on monitorId: Monitor.ID?) -> ExternalCommandResult {
-        guard let scratchpadToken = workspaceManager.scratchpadToken() else {
-            return .notFound
-        }
-        guard let entry = workspaceManager.entry(for: scratchpadToken) else {
-            cleanupScratchpadWindowResources(for: scratchpadToken)
-            return .notFound
-        }
-        guard !isManagedWindowSuspendedForNativeFullscreen(scratchpadToken) else {
-            return .notFound
-        }
-
-        if workspaceManager.isAppHidden(pid: entry.pid),
-           let handle = workspaceManager.handle(for: scratchpadToken)
-        {
-            return windowActionHandler.revealScratchpadFromBar(
-                handle: handle,
-                monitorId: monitorId
-            ) ? .executed : .notFound
-        }
-
-        if let monitorId {
-            _ = workspaceManager.setInteractionMonitor(monitorId)
-        }
-
-        if let hiddenState = workspaceManager.hiddenState(for: scratchpadToken) {
-            guard hiddenState.isScratchpad || hiddenState.workspaceInactive,
-                  let target = scratchpadTarget(on: monitorId)
-            else {
-                return .notFound
-            }
-            let updatedEntry = workspaceManager.entry(for: scratchpadToken) ?? entry
-            return showScratchpadWindow(updatedEntry, on: target.workspaceId, monitor: target.monitor)
-                ? .executed
-                : .notFound
-        }
-
-        if windowActionHandler.focusWindowFromBar(token: scratchpadToken) {
-            return .executed
-        }
-
-        focusWindow(scratchpadToken)
-        return .executed
-    }
-
     func setFocusFollowsMouse(_ enabled: Bool) {
         focusFollowsMouseEnabled = enabled
     }
@@ -1432,226 +1386,6 @@ final class WMController {
             return nil
         }
         return token
-    }
-
-    @discardableResult
-    private func captureVisibleFloatingGeometry(
-        for token: WindowToken,
-        preferredMonitor: Monitor? = nil
-    ) -> CGRect? {
-        guard !workspaceManager.isHiddenInCorner(token),
-              let entry = workspaceManager.entry(for: token),
-              let frame = liveFrame(for: entry)
-        else {
-            return nil
-        }
-
-        let referenceMonitor = floatingPlacementMonitor(
-            for: entry,
-            preferredMonitor: preferredMonitor,
-            frame: frame
-        )
-        workspaceManager.updateFloatingGeometry(
-            frame: frame,
-            for: token,
-            referenceMonitor: referenceMonitor,
-            restoreToFloating: true
-        )
-        return frame
-    }
-
-    @discardableResult
-    private func prepareWindowForScratchpadAssignment(
-        _ token: WindowToken,
-        preferredMonitor: Monitor? = nil
-    ) -> Bool {
-        guard let entry = workspaceManager.entry(for: token) else { return false }
-
-        if entry.mode == .floating {
-            guard captureVisibleFloatingGeometry(for: token, preferredMonitor: preferredMonitor) != nil
-                || workspaceManager.floatingState(for: token) != nil
-            else {
-                return false
-            }
-            if workspaceManager.manualLayoutOverride(for: token) != .forceFloat {
-                workspaceManager.setManualLayoutOverride(.forceFloat, for: token)
-            }
-            return true
-        }
-
-        guard let frame = liveFrame(for: entry) else { return false }
-        let referenceMonitor = floatingPlacementMonitor(
-            for: entry,
-            preferredMonitor: preferredMonitor,
-            frame: frame
-        )
-        _ = workspaceManager.setWindowMode(.floating, for: token)
-        workspaceManager.updateFloatingGeometry(
-            frame: frame,
-            for: token,
-            referenceMonitor: referenceMonitor,
-            restoreToFloating: true
-        )
-        if workspaceManager.manualLayoutOverride(for: token) != .forceFloat {
-            workspaceManager.setManualLayoutOverride(.forceFloat, for: token)
-        }
-        return true
-    }
-
-    private func scratchpadTarget(
-        on monitorId: Monitor.ID? = nil
-    ) -> (workspaceId: WorkspaceDescriptor.ID, monitor: Monitor)? {
-        guard let monitor = monitorId.flatMap({ workspaceManager.monitor(byId: $0) }) ?? monitorForInteraction(),
-              let workspaceId = workspaceManager.activeWorkspaceOrFirst(on: monitor.id)?.id
-        else {
-            return nil
-        }
-        return (workspaceId, monitor)
-    }
-
-    private func visibleFocusRecoveryToken(
-        in workspaceId: WorkspaceDescriptor.ID,
-        excluding excludedToken: WindowToken
-    ) -> WindowToken? {
-        let explicitCandidates = [
-            workspaceManager.lastFocusedToken(in: workspaceId),
-            workspaceManager.preferredFocusToken(in: workspaceId),
-            workspaceManager.lastFloatingFocusedToken(in: workspaceId),
-            workspaceManager.focusedToken
-        ]
-
-        for candidate in explicitCandidates {
-            guard let candidate,
-                  candidate != excludedToken,
-                  let entry = workspaceManager.entry(for: candidate),
-                  entry.workspaceId == workspaceId,
-                  isManagedWindowDisplayable(entry.token)
-            else {
-                continue
-            }
-            return candidate
-        }
-
-        if let tiledEntry = workspaceManager.tiledEntries(in: workspaceId).first(where: {
-            $0.token != excludedToken && isManagedWindowDisplayable($0.token)
-        }) {
-            return tiledEntry.token
-        }
-
-        return workspaceManager.floatingEntries(in: workspaceId).first(where: {
-            $0.token != excludedToken && isManagedWindowDisplayable($0.token)
-        })?.token
-    }
-
-    private func recoverFocusAfterScratchpadHide(
-        in workspaceId: WorkspaceDescriptor.ID,
-        excluding token: WindowToken,
-        on monitorId: Monitor.ID?
-    ) {
-        if let nextFocusToken = visibleFocusRecoveryToken(in: workspaceId, excluding: token) {
-            focusWindow(nextFocusToken)
-            return
-        }
-
-        _ = workspaceManager.resolveAndSetWorkspaceFocusToken(in: workspaceId, onMonitor: monitorId)
-    }
-
-    func cleanupScratchpadWindowResources(for token: WindowToken) {
-        layoutRefreshController.cancelPendingScratchpadReveal(for: token)
-        let frameEntry = [(pid: token.pid, windowId: token.windowId)]
-        axManager.cancelPendingFrameJobs(frameEntry)
-        axManager.unsuppressFrameWrites(frameEntry)
-        AXWindowService.unpinAXElement(for: UInt32(token.windowId))
-        if workspaceManager.clearScratchpadIfMatches(token) {
-            requestWorkspaceBarRefresh()
-        }
-    }
-
-    func cleanupScratchpadWindowResourcesIfNeeded(for token: WindowToken) {
-        guard workspaceManager.isScratchpadToken(token)
-            || workspaceManager.hiddenState(for: token)?.isScratchpad == true
-        else {
-            return
-        }
-        cleanupScratchpadWindowResources(for: token)
-    }
-
-    func rekeyScratchpadWindowResources(from oldToken: WindowToken, to newToken: WindowToken, axRef: AXWindowRef) {
-        guard workspaceManager.hiddenState(for: newToken)?.isScratchpad == true else { return }
-        AXWindowService.unpinAXElement(for: UInt32(oldToken.windowId))
-        AXWindowService.pinAXElement(axRef.element, for: UInt32(newToken.windowId))
-    }
-
-    private func hideScratchpadWindow(
-        _ entry: WindowState,
-        monitor: Monitor
-    ) {
-        // Hold an AX reference before hiding so reveal can still resolve windows
-        // whose apps drop them from kAXWindowsAttribute while off-screen
-        // (Calculator, some AppKit panels). axWindowRef enumeration would
-        // otherwise return nil and the reveal frame write would silently skip.
-        if let ref = AXWindowService.axWindowRef(for: UInt32(entry.windowId), pid: entry.pid) {
-            AXWindowService.pinAXElement(ref.element, for: UInt32(entry.windowId))
-        }
-
-        let preferredSide = layoutRefreshController.preferredHideSide(for: monitor)
-        layoutRefreshController.hideWindow(
-            entry,
-            monitor: monitor,
-            side: preferredSide,
-            reason: .scratchpad
-        )
-        requestWorkspaceBarRefresh()
-        recoverFocusAfterScratchpadHide(
-            in: workspaceManager.workspace(for: entry.token) ?? entry.workspaceId,
-            excluding: entry.token,
-            on: monitor.id
-        )
-    }
-
-    @discardableResult
-    private func showScratchpadWindow(
-        _ entry: WindowState,
-        on workspaceId: WorkspaceDescriptor.ID,
-        monitor: Monitor
-    ) -> Bool {
-        if entry.workspaceId != workspaceId {
-            reassignManagedWindow(entry.token, to: workspaceId)
-        }
-        let entry = workspaceManager.entry(for: entry.token) ?? entry
-        axManager.markWindowActive(entry.windowId)
-
-        if let hiddenState = workspaceManager.hiddenState(for: entry.token) {
-            let focusOnRevealSuccess: LayoutRefreshController.PostLayoutAction = { [weak self] in
-                self?.focusWindow(entry.token)
-            }
-            if hiddenState.isScratchpad {
-                return layoutRefreshController.restoreScratchpadWindow(
-                    entry,
-                    monitor: monitor,
-                    onSuccess: focusOnRevealSuccess
-                )
-            } else {
-                return layoutRefreshController.unhideWindow(
-                    entry,
-                    monitor: monitor,
-                    onSuccess: focusOnRevealSuccess
-                )
-            }
-        }
-
-        if let frame = workspaceManager.resolvedFloatingFrame(
-            for: entry.token,
-            preferredMonitor: monitor
-        ) {
-            axManager.forceApplyNextFrame(for: entry.windowId)
-            axManager.applyFramesParallel([
-                .init(pid: entry.pid, window: entry.axRef, frame: frame)
-            ])
-        }
-
-        focusWindow(entry.token)
-        return true
     }
 
     @discardableResult
@@ -2288,14 +2022,9 @@ final class WMController {
                 axEventHandler.cancelTrackedTilingPromotionRetry(windowId: token.windowId)
                 if let existingEntry {
                     affectedWorkspaceIds.insert(existingEntry.workspaceId)
-                    let removesScratchpadResources = workspaceManager.isScratchpadToken(token)
-                        || workspaceManager.hiddenState(for: token)?.isScratchpad == true
                     _ = workspaceManager.removeWindow(pid: token.pid, windowId: token.windowId)
                     mouseEventHandler.discardNativeTitleBarDrag(for: token)
                     axManager.removeWindowState(pid: token.pid, expectedWindow: existingEntry.axRef)
-                    if removesScratchpadResources {
-                        cleanupScratchpadWindowResources(for: token)
-                    }
                     relayoutNeeded = true
                 } else if evaluation.decision.disposition != .undecided {
                     axEventHandler.discardCreatePlacementContext(for: token.windowId)
@@ -2515,60 +2244,6 @@ final class WMController {
         return .executed
     }
 
-    @discardableResult
-    func assignFocusedWindowToScratchpad() -> ExternalCommandResult {
-        guard let token = focusedManagedTokenForCommand(),
-              let entry = workspaceManager.entry(for: token),
-              !isManagedWindowSuspendedForNativeFullscreen(token)
-        else {
-            return .notFound
-        }
-
-        if workspaceManager.isScratchpadToken(token) {
-            guard !workspaceManager.isHiddenInCorner(token) else {
-                return .notFound
-            }
-            cleanupScratchpadWindowResources(for: token)
-            applyManagedWindowOverride(.forceTile, for: token, entry: entry)
-            return .executed
-        }
-
-        if let existingScratchpadToken = workspaceManager.scratchpadToken() {
-            if workspaceManager.entry(for: existingScratchpadToken) == nil {
-                cleanupScratchpadWindowResources(for: existingScratchpadToken)
-            } else {
-                return .notFound
-            }
-        }
-
-        let preferredMonitor = monitorForInteraction() ?? workspaceManager.monitor(for: entry.workspaceId)
-        let transitionedFromTiling = entry.mode == .tiling
-        guard prepareWindowForScratchpadAssignment(token, preferredMonitor: preferredMonitor) else {
-            return .notFound
-        }
-
-        if workspaceManager.setScratchpadToken(token) {
-            requestWorkspaceBarRefresh()
-        }
-
-        guard let updatedEntry = workspaceManager.entry(for: token),
-              let hideMonitor = workspaceManager.monitor(for: updatedEntry.workspaceId) ?? preferredMonitor
-        else {
-            cleanupScratchpadWindowResources(for: token)
-            return .notFound
-        }
-
-        hideScratchpadWindow(updatedEntry, monitor: hideMonitor)
-
-        if transitionedFromTiling {
-            layoutRefreshController.requestLayoutCommandRelayout(
-                affectedWorkspaceIds: [workspaceManager.workspace(for: token) ?? updatedEntry.workspaceId]
-            )
-        }
-
-        return .executed
-    }
-
     private func applyManagedWindowOverride(
         _ override: ManualWindowOverride?,
         for token: WindowToken,
@@ -2585,14 +2260,9 @@ final class WMController {
             existingEntry: entry
         ) else {
             axEventHandler.cancelTrackedTilingPromotionRetry(windowId: token.windowId)
-            let removesScratchpadResources = workspaceManager.isScratchpadToken(token)
-                || workspaceManager.hiddenState(for: token)?.isScratchpad == true
             _ = workspaceManager.removeWindow(pid: token.pid, windowId: token.windowId)
             mouseEventHandler.discardNativeTitleBarDrag(for: token)
             axManager.removeWindowState(pid: token.pid, expectedWindow: entry.axRef)
-            if removesScratchpadResources {
-                cleanupScratchpadWindowResources(for: token)
-            }
             layoutRefreshController.requestRelayout(
                 reason: .windowRuleReevaluation,
                 affectedWorkspaceIds: [entry.workspaceId]
@@ -2626,54 +2296,6 @@ final class WMController {
             reason: .windowRuleReevaluation,
             affectedWorkspaceIds: [entry.workspaceId]
         )
-    }
-
-    @discardableResult
-    func toggleScratchpadWindow() -> ExternalCommandResult {
-        guard let scratchpadToken = workspaceManager.scratchpadToken() else {
-            return .notFound
-        }
-        guard let entry = workspaceManager.entry(for: scratchpadToken) else {
-            cleanupScratchpadWindowResources(for: scratchpadToken)
-            return .notFound
-        }
-        guard !isManagedWindowSuspendedForNativeFullscreen(scratchpadToken) else {
-            return .notFound
-        }
-        guard !workspaceManager.isAppHidden(pid: entry.pid) else {
-            return .notFound
-        }
-        guard let target = scratchpadTarget() else {
-            return .notFound
-        }
-
-        if let hiddenState = workspaceManager.hiddenState(for: scratchpadToken) {
-            let updatedEntry = workspaceManager.entry(for: scratchpadToken) ?? entry
-            if hiddenState.isScratchpad || hiddenState.workspaceInactive {
-                let started = showScratchpadWindow(updatedEntry, on: target.workspaceId, monitor: target.monitor)
-                return started ? .executed : .notFound
-            }
-            return .notFound
-        }
-
-        let hasCapturedGeometry = captureVisibleFloatingGeometry(
-            for: scratchpadToken,
-            preferredMonitor: target.monitor
-        ) != nil || workspaceManager.floatingState(for: scratchpadToken) != nil
-        guard hasCapturedGeometry else {
-            return .notFound
-        }
-
-        let liveEntry = workspaceManager.entry(for: scratchpadToken) ?? entry
-        if liveEntry.workspaceId == target.workspaceId,
-           isManagedWindowDisplayable(liveEntry.token)
-        {
-            hideScratchpadWindow(liveEntry, monitor: target.monitor)
-            return .executed
-        }
-
-        let started = showScratchpadWindow(liveEntry, on: target.workspaceId, monitor: target.monitor)
-        return started ? .executed : .notFound
     }
 
     func workspaceAssignment(pid: pid_t, windowId: Int) -> WorkspaceDescriptor.ID? {
@@ -2806,7 +2428,6 @@ final class WMController {
                     targetMonitor: targetMonitor,
                     currentFrame: liveFrame(for: entry),
                     targetFrame: targetFrame,
-                    isScratchpadHidden: workspaceManager.hiddenState(for: entry.token)?.isScratchpad == true,
                     isWorkspaceInactiveHidden: workspaceManager.hiddenState(for: entry.token)?.workspaceInactive == true
                 )
             )

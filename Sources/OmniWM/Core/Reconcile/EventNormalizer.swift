@@ -151,7 +151,6 @@ enum EventNormalizer {
              .niriPlacementsResolved,
              .nonManagedFocusChanged,
              .nonManagedFocusTargetChanged,
-             .scratchpadChanged,
              .selectionChanged,
              .spaceTopologyChanged,
              .suppressedFocusChanged,

@@ -94,8 +94,6 @@ enum RuntimeDiagnosticsReport {
         let destination = switch payload.destination {
         case .window:
             "window"
-        case .scratchpad:
-            "scratchpad"
         }
         return "id:\(intent.id),win:\(payload.token.windowId),workspace:\(payload.workspaceId.uuidString),destination:\(destination)"
     }
@@ -108,8 +106,6 @@ enum RuntimeDiagnosticsReport {
             "workspace-inactive"
         case let .layoutTransient(side):
             "layout-transient-\(side)"
-        case .scratchpad:
-            "scratchpad"
         }
         let nativeFullscreen = switch window.nativeFullscreenTransition {
         case .none:
@@ -148,7 +144,6 @@ enum RuntimeDiagnosticsReport {
             let placement = switch hiddenState.reason {
             case let .layoutTransient(side): "side=\(side)"
             case .workspaceInactive: "inactive"
-            case .scratchpad: "scratchpad"
             }
             guard let windowId = UInt32(exactly: entry.windowId),
                   let bounds = SkyLight.shared.getWindowBounds(windowId)

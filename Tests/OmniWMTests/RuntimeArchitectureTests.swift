@@ -1333,7 +1333,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             HiddenState(
                 proportionalPosition: .zero,
                 referenceMonitorId: monitor.id,
-                reason: .scratchpad
+                reason: .workspaceInactive
             ),
             for: floatingToken
         )
@@ -2077,7 +2077,6 @@ final class RuntimeArchitectureTests: XCTestCase {
             ),
             for: missingToken
         )
-        XCTAssertFalse(manager.setScratchpadToken(missingToken))
 
         XCTAssertTrue(
             manager.isSeqEpochCurrent(before, domains: [.workspace, .layout, .focus, .fullscreen])
@@ -3556,7 +3555,7 @@ final class RuntimeArchitectureTests: XCTestCase {
     }
 
     @MainActor
-    func testPendingScratchpadRevealUsesLiveWorkspaceAfterReassignment() throws {
+    func testPendingRevealUsesLiveWorkspaceAfterReassignment() throws {
         let controller = Self.controller()
         let sourceWorkspaceId = try XCTUnwrap(
             controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
@@ -3578,9 +3577,8 @@ final class RuntimeArchitectureTests: XCTestCase {
         let hiddenState = HiddenState(
             proportionalPosition: .zero,
             referenceMonitorId: nil,
-            reason: .scratchpad
+            reason: .workspaceInactive
         )
-        controller.workspaceManager.setScratchpadToken(token)
         controller.workspaceManager.setHiddenState(hiddenState, for: token)
         controller.reassignManagedWindow(token, to: destinationWorkspaceId)
 
@@ -3612,7 +3610,7 @@ final class RuntimeArchitectureTests: XCTestCase {
     }
 
     @MainActor
-    func testPendingScratchpadRevealSuccessActionRejectsStaleFocusSeq() throws {
+    func testPendingRevealSuccessActionRejectsStaleFocusSeq() throws {
         let controller = Self.controller()
         let workspaceId = try XCTUnwrap(controller.workspaceManager.workspaceId(for: "1", createIfMissing: true))
         let monitor = try XCTUnwrap(controller.workspaceManager.monitor(for: workspaceId))
@@ -3635,11 +3633,10 @@ final class RuntimeArchitectureTests: XCTestCase {
         let hiddenState = HiddenState(
             proportionalPosition: .zero,
             referenceMonitorId: nil,
-            reason: .scratchpad
+            reason: .workspaceInactive
         )
         var didRun = false
 
-        controller.workspaceManager.setScratchpadToken(token)
         controller.workspaceManager.setHiddenState(hiddenState, for: token)
         let entry = try XCTUnwrap(controller.workspaceManager.entry(for: token))
         let transactionId = try XCTUnwrap(
@@ -3672,7 +3669,7 @@ final class RuntimeArchitectureTests: XCTestCase {
     }
 
     @MainActor
-    func testPendingScratchpadRevealSuccessActionRebasesLocalHiddenMutation() throws {
+    func testPendingRevealSuccessActionRebasesLocalHiddenMutation() throws {
         let controller = Self.controller()
         let workspaceId = try XCTUnwrap(controller.workspaceManager.workspaceId(for: "1", createIfMissing: true))
         let monitor = try XCTUnwrap(controller.workspaceManager.monitor(for: workspaceId))
@@ -3689,11 +3686,10 @@ final class RuntimeArchitectureTests: XCTestCase {
         let hiddenState = HiddenState(
             proportionalPosition: .zero,
             referenceMonitorId: nil,
-            reason: .scratchpad
+            reason: .workspaceInactive
         )
         var didRun = false
 
-        controller.workspaceManager.setScratchpadToken(token)
         controller.workspaceManager.setHiddenState(hiddenState, for: token)
         let entry = try XCTUnwrap(controller.workspaceManager.entry(for: token))
         let transactionId = try XCTUnwrap(

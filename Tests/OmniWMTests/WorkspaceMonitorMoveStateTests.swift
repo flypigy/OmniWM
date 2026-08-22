@@ -408,7 +408,7 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
         XCTAssertEqual(engine.monitorContaining(workspace: workspaceId), fixture.center.id)
     }
 
-    func testFloatingTranslationPreservesNormalizedOriginAndExcludesHiddenAndScratchpadWindows() throws {
+    func testFloatingTranslationPreservesNormalizedOriginAndExcludesHiddenWindows() throws {
         let fixture = makeFixture(
             assignments: [("1", 0), ("2", 2)],
             centerSize: CGSize(width: 1000, height: 700)
@@ -430,13 +430,6 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
             mode: .floating,
             manager: manager
         )
-        let scratchToken = addWindow(
-            pid: 964_003,
-            windowId: 964_103,
-            workspaceId: workspaceId,
-            mode: .floating,
-            manager: manager
-        )
         let oversizedToken = addWindow(
             pid: 964_005,
             windowId: 964_105,
@@ -448,7 +441,7 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
         let proportionalFrame = CGRect(x: 40, y: 30, width: 240, height: 180)
         let oversizedFrame = CGRect(x: 40, y: 30, width: 1200, height: 800)
 
-        for token in [visibleToken, hiddenToken, scratchToken] {
+        for token in [visibleToken, hiddenToken] {
             manager.setFloatingState(
                 FloatingState(
                     lastFrame: proportionalFrame,
@@ -475,15 +468,6 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
                 reason: .workspaceInactive
             ),
             for: hiddenToken
-        )
-        XCTAssertTrue(manager.setScratchpadToken(scratchToken))
-        manager.setHiddenState(
-            HiddenState(
-                proportionalPosition: .zero,
-                referenceMonitorId: fixture.left.id,
-                reason: .scratchpad
-            ),
-            for: scratchToken
         )
 
         let outcome = manager.moveWorkspaceToMonitor(
@@ -516,43 +500,36 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
         XCTAssertEqual(manager.floatingState(for: hiddenToken)?.normalizedOrigin, normalizedOrigin)
         XCTAssertEqual(manager.floatingState(for: hiddenToken)?.referenceMonitorId, fixture.center.id)
         XCTAssertEqual(manager.floatingState(for: hiddenToken)?.lastFrame, visibleState.lastFrame)
-        XCTAssertEqual(manager.floatingState(for: scratchToken)?.referenceMonitorId, fixture.left.id)
     }
 
     func testNonTransferableConfirmedFocusRejectsWithoutMutation() throws {
-        for kind in ["native", "scratch"] {
-            let fixture = makeFixture(assignments: [("1", 0), ("2", 2)])
-            let manager = fixture.manager
-            let workspaceId = try XCTUnwrap(manager.workspaceId(named: "1"))
-            let token = addWindow(
-                pid: kind == "native" ? 965_001 : 965_002,
-                windowId: kind == "native" ? 965_101 : 965_102,
-                workspaceId: workspaceId,
-                mode: kind == "native" ? .tiling : .floating,
-                manager: manager
-            )
-            XCTAssertTrue(manager.setManagedFocus(token, in: workspaceId, onMonitor: fixture.left.id))
-            if kind == "native" {
-                manager.setLayoutReason(.nativeFullscreen, for: token)
-            } else {
-                XCTAssertTrue(manager.setScratchpadToken(token))
-            }
-            let initialSeq = manager.worldSeq
-            let initialEntry = try XCTUnwrap(manager.entry(for: token))
+        let fixture = makeFixture(assignments: [("1", 0), ("2", 2)])
+        let manager = fixture.manager
+        let workspaceId = try XCTUnwrap(manager.workspaceId(named: "1"))
+        let token = addWindow(
+            pid: 965_001,
+            windowId: 965_101,
+            workspaceId: workspaceId,
+            mode: .tiling,
+            manager: manager
+        )
+        XCTAssertTrue(manager.setManagedFocus(token, in: workspaceId, onMonitor: fixture.left.id))
+        manager.setLayoutReason(.nativeFullscreen, for: token)
+        let initialSeq = manager.worldSeq
+        let initialEntry = try XCTUnwrap(manager.entry(for: token))
 
-            let outcome = manager.moveWorkspaceToMonitor(
-                workspaceId,
-                to: fixture.center.id,
-                force: true
-            )
+        let outcome = manager.moveWorkspaceToMonitor(
+            workspaceId,
+            to: fixture.center.id,
+            force: true
+        )
 
-            XCTAssertEqual(outcome.status, .stateConflict)
-            XCTAssertEqual(manager.worldSeq, initialSeq)
-            XCTAssertNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
-            XCTAssertEqual(manager.monitorForWorkspace(workspaceId)?.id, fixture.left.id)
-            XCTAssertEqual(manager.focusedToken, token)
-            XCTAssertEqual(manager.entry(for: token), initialEntry)
-        }
+        XCTAssertEqual(outcome.status, .stateConflict)
+        XCTAssertEqual(manager.worldSeq, initialSeq)
+        XCTAssertNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
+        XCTAssertEqual(manager.monitorForWorkspace(workspaceId)?.id, fixture.left.id)
+        XCTAssertEqual(manager.focusedToken, token)
+        XCTAssertEqual(manager.entry(for: token), initialEntry)
     }
 
     func testSuspendedNativeFullscreenMemberRejectsMoveWithoutMutation() throws {
@@ -627,36 +604,6 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
         XCTAssertEqual(manager.activeWorkspace(on: fixture.left.id)?.id, workspaceId)
         XCTAssertEqual(manager.entry(for: token), initialEntry)
         XCTAssertEqual(manager.nativeFullscreenRecord(for: token), initialRecord)
-    }
-
-    func testVisibleNonfocusedScratchpadRejectsMoveWithoutMutation() throws {
-        let fixture = makeFixture(assignments: [("1", 0), ("2", 1), ("3", 2)])
-        let manager = fixture.manager
-        let workspaceId = try XCTUnwrap(manager.workspaceId(named: "1"))
-        let token = addWindow(
-            pid: 965_008,
-            windowId: 965_108,
-            workspaceId: workspaceId,
-            mode: .floating,
-            manager: manager
-        )
-        XCTAssertTrue(manager.setScratchpadToken(token))
-        XCTAssertNil(manager.focusedToken)
-        XCTAssertNil(manager.hiddenState(for: token))
-        let initialSeq = manager.worldSeq
-        let initialEntry = try XCTUnwrap(manager.entry(for: token))
-
-        let outcome = manager.moveWorkspaceToMonitor(
-            workspaceId,
-            to: fixture.center.id,
-            force: true
-        )
-
-        XCTAssertEqual(outcome.status, .stateConflict)
-        XCTAssertEqual(manager.worldSeq, initialSeq)
-        XCTAssertNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
-        XCTAssertEqual(manager.monitorForWorkspace(workspaceId)?.id, fixture.left.id)
-        XCTAssertEqual(manager.entry(for: token), initialEntry)
     }
 
     func testNativeFullscreenEnterExpiryRemovesRecord() throws {
@@ -1089,105 +1036,6 @@ final class WorkspaceMonitorMoveStateTests: XCTestCase {
         XCTAssertEqual(outcomes.count, 1)
         XCTAssertEqual(outcomes[0].status, .executed)
         XCTAssertTrue(outcomes[0].affectedWorkspaces.contains(workspaceId))
-    }
-
-    func testConfigurationReapplyDefersVisibleScratchpadUntilHidden() throws {
-        let fixture = makeFixture(assignments: [("1", 0), ("2", 1), ("3", 2)])
-        let manager = fixture.manager
-        let workspaceId = try XCTUnwrap(manager.workspaceId(named: "1"))
-        let token = addWindow(
-            pid: 965_010,
-            windowId: 965_110,
-            workspaceId: workspaceId,
-            mode: .floating,
-            manager: manager
-        )
-        manager.setFloatingState(
-            FloatingState(
-                lastFrame: CGRect(x: 80, y: 60, width: 240, height: 180),
-                normalizedOrigin: CGPoint(x: 0.35, y: 0.6),
-                referenceMonitorId: fixture.left.id,
-                restoreToFloating: true
-            ),
-            for: token
-        )
-        _ = manager.setInteractionMonitor(fixture.right.id)
-        XCTAssertEqual(
-            manager.moveWorkspaceToMonitor(
-                workspaceId,
-                to: fixture.center.id,
-                force: true
-            ).status,
-            .executed
-        )
-        XCTAssertTrue(manager.setScratchpadToken(token))
-        XCTAssertEqual(manager.floatingState(for: token)?.referenceMonitorId, fixture.center.id)
-        var outcomes: [WorkspaceMonitorMoveOutcome] = []
-        manager.onDeferredWorkspaceMonitorMove = { outcomes.append($0) }
-
-        manager.applySettings()
-
-        XCTAssertNotNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
-        XCTAssertEqual(manager.monitorForWorkspace(workspaceId)?.id, fixture.center.id)
-        XCTAssertTrue(manager.pendingRuntimeMonitorOverrideClearWorkspaceIds.contains(workspaceId))
-        XCTAssertTrue(outcomes.isEmpty)
-
-        manager.setHiddenState(
-            HiddenState(
-                proportionalPosition: .zero,
-                referenceMonitorId: fixture.center.id,
-                reason: .scratchpad
-            ),
-            for: token
-        )
-
-        XCTAssertNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
-        XCTAssertEqual(manager.monitorForWorkspace(workspaceId)?.id, fixture.left.id)
-        XCTAssertEqual(manager.entry(for: token)?.observedState.monitorId, fixture.left.id)
-        XCTAssertEqual(manager.entry(for: token)?.desiredState.monitorId, fixture.left.id)
-        XCTAssertEqual(manager.floatingState(for: token)?.referenceMonitorId, fixture.center.id)
-        XCTAssertTrue(manager.pendingRuntimeMonitorOverrideClearWorkspaceIds.isEmpty)
-        XCTAssertEqual(outcomes.count, 1)
-        XCTAssertTrue(outcomes[0].floatingRelocations.isEmpty)
-    }
-
-    func testConfigurationReapplyDefersVisibleScratchpadUntilReassigned() throws {
-        let fixture = makeFixture(assignments: [("1", 0), ("2", 1), ("3", 2)])
-        let manager = fixture.manager
-        let workspaceId = try XCTUnwrap(manager.workspaceId(named: "1"))
-        let scratchDestinationId = try XCTUnwrap(manager.workspaceId(named: "2"))
-        let token = addWindow(
-            pid: 965_016,
-            windowId: 965_116,
-            workspaceId: workspaceId,
-            mode: .floating,
-            manager: manager
-        )
-        _ = manager.setInteractionMonitor(fixture.right.id)
-        XCTAssertEqual(
-            manager.moveWorkspaceToMonitor(
-                workspaceId,
-                to: fixture.center.id,
-                force: true
-            ).status,
-            .executed
-        )
-        XCTAssertTrue(manager.setScratchpadToken(token))
-        var outcomes: [WorkspaceMonitorMoveOutcome] = []
-        manager.onDeferredWorkspaceMonitorMove = { outcomes.append($0) }
-
-        manager.applySettings()
-
-        XCTAssertNotNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
-        XCTAssertTrue(manager.pendingRuntimeMonitorOverrideClearWorkspaceIds.contains(workspaceId))
-
-        manager.setWorkspace(for: token, to: scratchDestinationId)
-
-        XCTAssertNil(manager.descriptor(for: workspaceId)?.runtimeMonitorOverride)
-        XCTAssertEqual(manager.monitorForWorkspace(workspaceId)?.id, fixture.left.id)
-        XCTAssertEqual(manager.workspace(for: token), scratchDestinationId)
-        XCTAssertTrue(manager.pendingRuntimeMonitorOverrideClearWorkspaceIds.isEmpty)
-        XCTAssertEqual(outcomes.count, 1)
     }
 
     func testConfigurationReapplyDefersHiddenAppUntilLayoutStateRestores() throws {

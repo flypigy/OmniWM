@@ -56,7 +56,6 @@ final class WorldStore {
     private(set) var invariantViolationCounts: [String: Int] = [:]
     private(set) var focus = FocusSessionSnapshot()
     private(set) var viewports: [WorkspaceDescriptor.ID: ViewportState] = [:]
-    private(set) var scratchpadToken: WindowToken?
     private(set) var hiddenAppPIDs: Set<pid_t> = []
     private var appVisibilityGenerationByPID: [pid_t: UInt64] = [:]
     private(set) var monitorSessions: [Monitor.ID: MonitorSession] = [:]
@@ -346,10 +345,6 @@ final class WorldStore {
         case let .managedReplacementMetadataChanged(token, _, _, metadata, _):
             guard phase == .beforePlan else { return }
             model.setManagedReplacementMetadata(metadata, for: token)
-
-        case let .scratchpadChanged(token, _):
-            guard phase == .beforePlan else { return }
-            scratchpadToken = token
 
         case let .visibleWorkspacesChanged(sessions, _):
             guard phase == .beforePlan else { return }

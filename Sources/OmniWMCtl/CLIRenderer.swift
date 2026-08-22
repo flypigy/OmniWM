@@ -290,13 +290,12 @@ enum CLIRenderer {
                 window.display?.name ?? "-",
                 window.mode?.rawValue ?? "-",
                 boolDescription(window.isFocused),
-                boolDescription(window.isVisible),
-                boolDescription(window.isScratchpad)
+                boolDescription(window.isVisible)
             ]
         }
 
         return formatRows(
-            headers: ["ID", "PID", "APP", "TITLE", "WORKSPACE", "DISPLAY", "MODE", "FOCUSED", "VISIBLE", "SCRATCHPAD"],
+            headers: ["ID", "PID", "APP", "TITLE", "WORKSPACE", "DISPLAY", "MODE", "FOCUSED", "VISIBLE"],
             rows: rows,
             format: format
         )
@@ -594,7 +593,7 @@ enum CLIRenderer {
 
     private static func countsDescription(_ counts: IPCWorkspaceWindowCounts?) -> String {
         guard let counts else { return "-" }
-        return "total=\(counts.total), tiled=\(counts.tiled), floating=\(counts.floating), scratchpad=\(counts.scratchpad)"
+        return "total=\(counts.total), tiled=\(counts.tiled), floating=\(counts.floating)"
     }
 
     private static func frameDescription(_ rect: IPCRect?) -> String {

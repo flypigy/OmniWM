@@ -35,8 +35,7 @@ extension AXEventHandler {
             for: token,
             referenceMonitor: targetMonitor
         )
-        guard !controller.workspaceManager.isScratchpadToken(token),
-              controller.workspaceManager.monitorId(for: entry.workspaceId) != targetMonitor.id,
+        guard controller.workspaceManager.monitorId(for: entry.workspaceId) != targetMonitor.id,
               let targetWorkspace = controller.workspaceManager.activeWorkspaceOrFirst(
                   on: targetMonitor.id
               ),

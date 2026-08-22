@@ -12,7 +12,6 @@ enum LayoutReason: Codable, Equatable {
 enum HiddenReason: Equatable {
     case workspaceInactive
     case layoutTransient(HideSide)
-    case scratchpad
 }
 
 struct HiddenState: Equatable {
@@ -34,17 +33,9 @@ struct HiddenState: Equatable {
         return nil
     }
 
-    var isScratchpad: Bool {
-        if case .scratchpad = reason {
-            return true
-        }
-        return false
-    }
-
     var restoresViaFloatingState: Bool {
         switch reason {
-        case .workspaceInactive,
-             .scratchpad:
+        case .workspaceInactive:
             true
         case .layoutTransient:
             false
@@ -59,23 +50,6 @@ struct HiddenState: Equatable {
         self.proportionalPosition = proportionalPosition
         self.referenceMonitorId = referenceMonitorId
         self.reason = reason
-    }
-
-    init(
-        proportionalPosition: CGPoint,
-        referenceMonitorId: Monitor.ID?,
-        workspaceInactive: Bool,
-        offscreenSide: HideSide? = nil
-    ) {
-        self.proportionalPosition = proportionalPosition
-        self.referenceMonitorId = referenceMonitorId
-        if workspaceInactive {
-            reason = .workspaceInactive
-        } else if let offscreenSide {
-            reason = .layoutTransient(offscreenSide)
-        } else {
-            reason = .scratchpad
-        }
     }
 }
 

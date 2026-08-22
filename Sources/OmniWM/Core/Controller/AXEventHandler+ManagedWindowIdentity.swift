@@ -522,7 +522,6 @@ extension AXEventHandler {
             }
 
             controller.intentLedger.rekeyManagedRequest(from: oldToken, to: newToken)
-            controller.rekeyScratchpadWindowResources(from: oldToken, to: newToken, axRef: axRef)
             controller.layoutRefreshController.rekeyPendingRevealTransaction(
                 from: oldToken,
                 to: newToken,

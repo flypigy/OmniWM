@@ -20,7 +20,6 @@ struct WorkspaceBarItem: Identifiable, Equatable {
 
 struct WorkspaceBarProjection: Equatable {
     let items: [WorkspaceBarItem]
-    let scratchpad: WorkspaceBarScratchpadItem?
 }
 
 struct WorkspaceBarWindowItem: Identifiable, Equatable, @unchecked Sendable {
@@ -64,18 +63,6 @@ struct WorkspaceBarWindowInfo: Identifiable, Equatable, @unchecked Sendable {
     let isAppHidden: Bool
 }
 
-struct WorkspaceBarScratchpadItem: Identifiable, Equatable {
-    let window: WorkspaceBarWindowItem
-    let isVisible: Bool
-    let workspaceId: WorkspaceDescriptor.ID
-    let workspaceName: String
-    let rawWorkspaceName: String
-
-    var id: WindowToken {
-        window.id
-    }
-}
-
 struct WorkspaceBarSnapshot: Equatable {
     let projection: WorkspaceBarProjection
     let showLabels: Bool
@@ -87,10 +74,6 @@ struct WorkspaceBarSnapshot: Equatable {
 
     var items: [WorkspaceBarItem] {
         projection.items
-    }
-
-    var scratchpad: WorkspaceBarScratchpadItem? {
-        projection.scratchpad
     }
 }
 
@@ -107,9 +90,6 @@ enum WorkspaceBarIslandSlice: Hashable {
         }
     }
 
-    func scratchpad(in snapshot: WorkspaceBarSnapshot) -> WorkspaceBarScratchpadItem? {
-        self == .active ? nil : snapshot.scratchpad
-    }
 }
 
 @MainActor @Observable
@@ -129,7 +109,6 @@ struct WorkspaceBarView: View {
     @Bindable var motionPolicy: MotionPolicy
     let onFocusWorkspace: (WorkspaceBarItem) -> Void
     let onFocusWindow: (WindowHandle) -> Void
-    let onActivateScratchpad: () -> Void
     var onToggleSystemStats: () -> Void = {}
     var onSystemStatsAnchorChange: (CGPoint?) -> Void = { _ in }
 
@@ -141,7 +120,6 @@ struct WorkspaceBarView: View {
             animationsEnabled: motionPolicy.animationsEnabled,
             onFocusWorkspace: onFocusWorkspace,
             onFocusWindow: onFocusWindow,
-            onActivateScratchpad: onActivateScratchpad,
             onToggleSystemStats: onToggleSystemStats,
             onSystemStatsAnchorChange: onSystemStatsAnchorChange
         )
@@ -162,7 +140,6 @@ struct WorkspaceBarMeasurementView: View {
             animationsEnabled: false,
             onFocusWorkspace: { _ in },
             onFocusWindow: { _ in },
-            onActivateScratchpad: {},
             onToggleSystemStats: {},
             onSystemStatsAnchorChange: { _ in }
         )
@@ -178,7 +155,6 @@ private struct WorkspaceBarContentView: View {
     let animationsEnabled: Bool
     let onFocusWorkspace: (WorkspaceBarItem) -> Void
     let onFocusWindow: (WindowHandle) -> Void
-    let onActivateScratchpad: () -> Void
     let onToggleSystemStats: () -> Void
     let onSystemStatsAnchorChange: (CGPoint?) -> Void
 
@@ -231,18 +207,6 @@ private struct WorkspaceBarContentView: View {
                     textColor: textColor,
                     onFocusWorkspace: { onFocusWorkspace(item) },
                     onFocusWindow: onFocusWindow
-                )
-            }
-
-            if let scratchpad = slice.scratchpad(in: snapshot) {
-                ScratchpadPillView(
-                    item: scratchpad,
-                    iconSize: iconSize,
-                    itemHeight: itemHeight,
-                    animationsEnabled: animationsEnabled,
-                    accentColor: accentColor,
-                    textColor: textColor,
-                    onActivateScratchpad: onActivateScratchpad
                 )
             }
 
@@ -547,88 +511,6 @@ private struct FloatingWindowsGroupView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Floating windows")
-    }
-}
-
-@MainActor
-private struct ScratchpadPillView: View {
-    let item: WorkspaceBarScratchpadItem
-    let iconSize: CGFloat
-    let itemHeight: CGFloat
-    let animationsEnabled: Bool
-    let accentColor: Color?
-    let textColor: Color?
-    let onActivateScratchpad: () -> Void
-
-    @State private var isHovered = false
-
-    private var resolvedAccentColor: Color {
-        accentColor ?? .accentColor
-    }
-
-    private var resolvedSecondaryTextColor: Color {
-        textColor ?? .secondary
-    }
-
-    var body: some View {
-        Button(action: onActivateScratchpad) {
-            HStack(spacing: 5) {
-                Image(systemName: "tray.fill")
-                    .font(.system(size: max(10, iconSize * 0.64), weight: .semibold))
-                    .foregroundColor(item.window.isFocused ? resolvedAccentColor : resolvedSecondaryTextColor)
-                    .accessibilityHidden(true)
-
-                AppIconImage(icon: item.window.icon)
-                    .frame(width: iconSize, height: iconSize)
-                    .opacity(item.window.isFocused ? 1 : 0.82)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: itemHeight)
-            .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(scale)
-        .animation(animationsEnabled ? .easeInOut(duration: 0.12) : nil, value: isHovered)
-        .animation(animationsEnabled ? .easeInOut(duration: 0.15) : nil, value: item.window.isFocused)
-        .background {
-            Capsule(style: .continuous)
-                .fill(item.window.isFocused ? resolvedAccentColor.opacity(0.18) : Color.secondary.opacity(0.08))
-                .background(.regularMaterial, in: Capsule(style: .continuous))
-                .overlay {
-                    Capsule(style: .continuous)
-                        .strokeBorder(
-                            item.window.isFocused ? resolvedAccentColor : Color.secondary
-                                .opacity(item.isVisible ? 0.36 : 0.22),
-                            lineWidth: item.window.isFocused ? 1.2 : 0.8
-                        )
-                }
-        }
-        .onHover { hovering in
-            isHovered = hovering
-        }
-        .accessibilityLabel("Scratchpad")
-        .accessibilityValue(accessibilityValue)
-        .help("Scratchpad: \(item.window.appName), \(item.isVisible ? "visible" : "hidden")")
-    }
-
-    private var scale: CGFloat {
-        if item.window.isFocused {
-            1.04
-        } else if isHovered {
-            1.03
-        } else {
-            1
-        }
-    }
-
-    private var accessibilityValue: String {
-        var parts = [item.window.appName, item.isVisible ? "Visible" : "Hidden"]
-        if item.window.isFocused {
-            parts.append("Focused")
-        }
-        parts.append("Workspace \(item.workspaceName)")
-        return parts.joined(separator: ", ")
     }
 }
 
