@@ -384,6 +384,8 @@ private struct GlobalNiriSettingsSection: View {
                     controller.updateNiriConfig(infiniteLoop: newValue)
                 }
 
+            Toggle("Remember Window Width per App", isOn: $settings.niriRememberWindowWidth)
+
             Picker("Center Focused Column", selection: $settings.niriCenterFocusedColumn) {
                 ForEach(CenterFocusedColumn.allCases, id: \.self) { mode in
                     Text(mode.displayName).tag(mode)

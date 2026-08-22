@@ -752,6 +752,11 @@ final class MouseEventHandler {
                 gaps: gaps
             )
         }
+        let primaryAxisEdges: ResizeEdge = monitor.orientation == .vertical
+            ? [.top, .bottom] : [.left, .right]
+        if !resize.edges.intersection(primaryAxisEdges).isEmpty {
+            controller.rememberNiriColumnWidth(for: resizedToken, in: workspaceId)
+        }
         controller.workspaceManager.recordLayoutOperation(
             .interactiveResizeEnded(token: resizedToken),
             in: workspaceId,

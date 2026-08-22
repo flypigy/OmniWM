@@ -127,6 +127,10 @@ final class SettingsStore {
         didSet { scheduleSave() }
     }
 
+    var niriRememberWindowWidth = SettingsStore.defaultExport.niriRememberWindowWidth {
+        didSet { scheduleSave() }
+    }
+
     var niriInfiniteLoop = SettingsStore.defaultExport.niriInfiniteLoop {
         didSet { scheduleSave() }
     }
@@ -569,6 +573,7 @@ final class SettingsStore {
             outerGapBottom: outerGapBottom,
             niriVisibleContainerCount: niriVisibleContainerCount,
             niriInfiniteLoop: niriInfiniteLoop,
+            niriRememberWindowWidth: niriRememberWindowWidth,
             niriCenterFocusedColumn: niriCenterFocusedColumn.rawValue,
             niriAlwaysCenterSingleColumn: niriAlwaysCenterSingleColumn,
             niriSingleWindowFit: niriSingleWindowFit.serialized,
@@ -672,6 +677,7 @@ final class SettingsStore {
 
         niriVisibleContainerCount = export.niriVisibleContainerCount
         niriInfiniteLoop = export.niriInfiniteLoop
+        niriRememberWindowWidth = export.niriRememberWindowWidth
         niriCenterFocusedColumn = CenterFocusedColumn(rawValue: export.niriCenterFocusedColumn) ?? .never
         niriAlwaysCenterSingleColumn = export.niriAlwaysCenterSingleColumn
         niriSingleWindowFit = SingleWindowFit(serialized: export.niriSingleWindowFit)

@@ -76,6 +76,7 @@ struct CanonicalTOMLConfig: Codable, Equatable {
     struct Niri: Codable, Equatable {
         var visibleContainerCount: Int
         var infiniteLoop: Bool
+        var rememberWindowWidth: Bool
         var centerFocusedColumn: String
         var alwaysCenterSingleColumn: Bool
         var singleWindowFit: String
@@ -571,6 +572,12 @@ extension CanonicalTOMLConfig.Niri {
             default: defaults.visibleContainerCount,
             recovering: recovering
         )
+        rememberWindowWidth = try container.decode(
+            Bool.self,
+            forKey: .rememberWindowWidth,
+            default: defaults.rememberWindowWidth,
+            recovering: recovering
+        )
         infiniteLoop = try container.decode(
             Bool.self,
             forKey: .infiniteLoop,
@@ -1037,6 +1044,7 @@ extension CanonicalTOMLConfig {
         niri = Niri(
             visibleContainerCount: export.niriVisibleContainerCount,
             infiniteLoop: export.niriInfiniteLoop,
+            rememberWindowWidth: export.niriRememberWindowWidth,
             centerFocusedColumn: export.niriCenterFocusedColumn,
             alwaysCenterSingleColumn: export.niriAlwaysCenterSingleColumn,
             singleWindowFit: export.niriSingleWindowFit,
@@ -1146,6 +1154,7 @@ extension CanonicalTOMLConfig {
             outerGapBottom: gaps.outer.bottom,
             niriVisibleContainerCount: niri.visibleContainerCount,
             niriInfiniteLoop: niri.infiniteLoop,
+            niriRememberWindowWidth: niri.rememberWindowWidth,
             niriCenterFocusedColumn: niri.centerFocusedColumn,
             niriAlwaysCenterSingleColumn: niri.alwaysCenterSingleColumn,
             niriSingleWindowFit: niri.singleWindowFit,

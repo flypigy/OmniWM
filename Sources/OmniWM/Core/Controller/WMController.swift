@@ -859,6 +859,42 @@ final class WMController {
         mouseWarpHandler.resetTransientState()
     }
 
+    /// Width memory: after a manual primary-axis width adjustment, persist the
+    /// column width as the app's `initialContainerPrimarySpan` rule so future
+    /// windows of the same app open with the remembered width.
+    func rememberNiriColumnWidth(for token: WindowToken, in workspaceId: WorkspaceDescriptor.ID) {
+        guard settings.niriRememberWindowWidth else { return }
+        guard let engine = niriEngine,
+              let windowNode = engine.findNode(for: token, in: workspaceId),
+              let column = engine.findColumn(containing: windowNode, in: workspaceId),
+              let monitor = workspaceManager.monitor(for: workspaceId)
+        else { return }
+        guard let bundleId = workspaceManager.entry(for: token)?.managedReplacementMetadata?.bundleId,
+              !bundleId.isEmpty
+        else { return }
+
+        let workingFrame = insetWorkingFrame(for: monitor)
+        let gaps = innerGap(for: monitor)
+        let availableSpace = workingFrame.width
+        guard availableSpace > gaps * 2 else { return }
+        let proportion = (Double(column.settledWidth) + Double(gaps)) / Double(availableSpace - gaps)
+        let rounded = (proportion * 10_000).rounded() / 10_000
+        let clamped = min(max(rounded, 0.05), 1.0)
+
+        var rules = settings.appRules
+        if let index = rules.firstIndex(where: {
+            $0.bundleId.caseInsensitiveCompare(bundleId) == .orderedSame
+        }) {
+            if let existing = rules[index].initialContainerPrimarySpan,
+               abs(existing - clamped) < 0.005 { return }
+            rules[index].initialContainerPrimarySpan = clamped
+        } else {
+            rules.append(AppRule(bundleId: bundleId, initialContainerPrimarySpan: clamped))
+        }
+        settings.appRules = rules
+        updateAppRules()
+    }
+
     func innerGap(for monitor: Monitor) -> CGFloat {
         guard settings.gapSettings(for: monitor)?.innerGap != nil else {
             return CGFloat(workspaceManager.gaps)

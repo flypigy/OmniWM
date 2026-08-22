@@ -34,6 +34,7 @@ struct SettingsExport: Equatable {
 
     var niriVisibleContainerCount: Int
     var niriInfiniteLoop: Bool
+    var niriRememberWindowWidth: Bool
     var niriCenterFocusedColumn: String
     var niriAlwaysCenterSingleColumn: Bool
     var niriSingleWindowFit: String
@@ -143,6 +144,7 @@ extension SettingsExport {
             outerGapBottom: 0,
             niriVisibleContainerCount: 2,
             niriInfiniteLoop: false,
+            niriRememberWindowWidth: false,
             niriCenterFocusedColumn: CenterFocusedColumn.never.rawValue,
             niriAlwaysCenterSingleColumn: false,
             niriSingleWindowFit: SingleWindowFit.fullScreen.serialized,

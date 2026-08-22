@@ -1836,6 +1836,7 @@ enum StructuralMutationOutcome: Equatable {
                 orientation: orientation
             )
             recordLayoutOperation(.windowSizeChanged(token: windowNode.token), in: wsId)
+            controller?.rememberNiriColumnWidth(for: windowNode.token, in: wsId)
             requestLayoutCommandRelayout(in: wsId)
             startScrollAnimationIfNeeded(for: wsId, state: state, engine: engine)
         }
