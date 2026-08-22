@@ -30,8 +30,6 @@ extension AXEventHandler {
         guard let controller else { return }
         let token = entry.token
         let workspaceId = entry.workspaceId
-        let layoutType = controller.workspaceManager.descriptor(for: workspaceId)
-            .map { controller.settings.layoutType(for: $0.name) } ?? .defaultLayout
         let ownsLiveFocus = controller.workspaceManager.focusedToken == token
             || controller.workspaceManager.nonManagedFocusToken == token
         let policy = retirementPolicy(for: reason)
@@ -39,7 +37,7 @@ extension AXEventHandler {
         var oldFrames: [WindowToken: CGRect] = [:]
         var removedNodeId: NodeId?
         var removedNiriColumn = false
-        if layoutType != .dwindle, let engine = controller.niriEngine {
+        if let engine = controller.niriEngine {
             oldFrames = engine.captureWindowFrames(in: workspaceId)
             let node = engine.findNode(for: token, in: workspaceId)
             removedNodeId = node?.id
@@ -62,7 +60,6 @@ extension AXEventHandler {
 
         controller.layoutRefreshController.requestWindowRemoval(
             workspaceId: workspaceId,
-            layoutType: layoutType,
             removedNodeId: removedNodeId,
             removedNiriColumn: removedNiriColumn,
             niriOldFrames: oldFrames,

@@ -56,17 +56,6 @@ struct WorkspacesSettingsTab: View {
 
     var body: some View {
         Form {
-            Section("Default Layout") {
-                Picker("Layout Algorithm", selection: $settings.defaultLayoutType) {
-                    ForEach(LayoutType.allCases.filter { $0 != .defaultLayout }) { layout in
-                        Text(layout.displayName).tag(layout)
-                    }
-                }
-                .onChange(of: settings.defaultLayoutType) { _, _ in
-                    controller.updateWorkspaceConfig()
-                }
-            }
-
             Section {
                 if settings.workspaceConfigurations.isEmpty {
                     Text("No workspaces configured")
@@ -245,16 +234,6 @@ struct WorkspaceConfigurationRow: View {
                 .foregroundColor(.secondary)
                 .frame(minWidth: 70, alignment: .leading)
 
-            Divider()
-                .frame(height: 24)
-
-            Text(configuration.layoutType.displayName)
-                .font(.caption)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.accentColor.opacity(0.1))
-                .cornerRadius(4)
-
             Spacer()
 
             Button(action: onEdit) {
@@ -361,12 +340,6 @@ struct WorkspaceEditSheet: View {
                 )
                 .font(.caption)
                 .foregroundColor(.secondary)
-
-                Picker("Layout", selection: $configuration.layoutType) {
-                    ForEach(LayoutType.allCases) { layout in
-                        Text(layout.displayName).tag(layout)
-                    }
-                }
             }
 
             HStack {

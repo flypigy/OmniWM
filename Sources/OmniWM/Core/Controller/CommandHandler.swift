@@ -51,17 +51,6 @@ final class CommandHandler {
             return .ignoredOverview
         }
 
-        let layoutType = currentLayoutType()
-
-        switch (command.layoutCompatibility, layoutType) {
-        case (.niri, .dwindle),
-             (.dwindle, .niri),
-             (.dwindle, .defaultLayout):
-            return .ignoredLayoutMismatch
-        default:
-            break
-        }
-
         switch command {
         case let .focus(direction):
             focusWindow(direction: direction)
@@ -192,20 +181,6 @@ final class CommandHandler {
             controller.workspaceNavigationHandler.swapCurrentWorkspaceWithMonitor(direction: direction)
         case .balanceSizes:
             layoutHandler(as: LayoutSizable.self)?.balanceSizes()
-        case .moveToRoot:
-            moveToRootInDwindle()
-        case .toggleSplit:
-            toggleSplitInDwindle()
-        case .swapSplit:
-            swapSplitInDwindle()
-        case let .resizeAlongAxis(orientation, grow):
-            resizeAlongAxisInDwindle(orientation: orientation, grow: grow)
-        case let .resizeFocusedWindow(grow):
-            resizeFocusedWindowInDwindle(grow: grow)
-        case let .preselect(direction):
-            preselectInDwindle(direction: direction)
-        case .preselectClear:
-            clearPreselectInDwindle()
         case .workspaceBackAndForth:
             controller.workspaceNavigationHandler.workspaceBackAndForth()
         case let .focusWorkspaceAnywhere(index):
@@ -229,8 +204,6 @@ final class CommandHandler {
             controller.toggleWorkspaceBarVisibility()
         case .toggleHiddenBarPanel:
             controller.toggleHiddenBarPanel()
-        case .toggleWorkspaceLayout:
-            toggleWorkspaceLayout()
         case .toggleOverview:
             controller.toggleOverview()
         case .toggleSystemStats:
@@ -245,16 +218,7 @@ final class CommandHandler {
     }
 
     private func layoutHandler<T>(as capability: T.Type) -> T? {
-        guard let controller else { return nil }
-        let layoutType = currentLayoutType()
-        let handler: AnyObject = switch layoutType {
-        case .dwindle:
-            controller.layoutRefreshController.dwindleHandler
-        case .niri,
-             .defaultLayout:
-            controller.layoutRefreshController.niriHandler
-        }
-        return handler as? T
+        controller?.layoutRefreshController.niriHandler as? T
     }
 
     private func focusPreviousInNiri() {
@@ -684,80 +648,36 @@ final class CommandHandler {
     }
 
     private func moveWindow(direction: Direction) -> WindowMoveOutcome {
-        switch currentLayoutType() {
-        case .dwindle:
-            controller?.dwindleLayoutHandler.moveWindow(direction: direction) ?? .blocked
-        case .niri,
-             .defaultLayout:
-            moveWindowInNiri(direction: direction)
-        }
+        moveWindowInNiri(direction: direction)
     }
 
     private func focusWindow(direction: Direction) {
         guard let controller else { return }
-        switch currentLayoutType() {
-        case .dwindle:
-            if controller.dwindleLayoutHandler.focusNeighbor(direction: direction) {
-                return
-            }
-            if controller.settings.focusCrossesMonitorAtEdge,
-               controller.workspaceNavigationHandler.focusMonitor(direction: direction)
-            {
-                return
-            }
-            _ = controller.dwindleLayoutHandler.wrapGroupFocus(direction: direction)
-        case .niri,
-             .defaultLayout:
-            if controller.niriLayoutHandler.focusNeighbor(direction: direction) != true,
-               controller.settings.focusCrossesMonitorAtEdge
-            {
-                _ = controller.workspaceNavigationHandler.focusMonitor(direction: direction)
-            }
+        if controller.niriLayoutHandler.focusNeighbor(direction: direction) != true,
+           controller.settings.focusCrossesMonitorAtEdge
+        {
+            _ = controller.workspaceNavigationHandler.focusMonitor(direction: direction)
         }
     }
 
     private func moveWindowWithinContainer(direction: Direction) {
-        switch currentLayoutType() {
-        case .dwindle:
-            controller?.dwindleLayoutHandler.moveGroupMember(direction: direction)
-        case .niri,
-             .defaultLayout:
-            controller?.niriLayoutHandler.moveWindowWithinContainer(direction: direction)
-        }
+        controller?.niriLayoutHandler.moveWindowWithinContainer(direction: direction)
     }
 
     private func moveContainer(direction: Direction) {
-        switch currentLayoutType() {
-        case .dwindle:
-            _ = controller?.dwindleLayoutHandler.swapWindow(direction: direction)
-        case .niri,
-             .defaultLayout:
-            controller?.niriLayoutHandler.moveColumn(direction: direction)
-        }
+        controller?.niriLayoutHandler.moveColumn(direction: direction)
     }
 
     private func focusWindowWrapping(direction: Direction) {
-        switch currentLayoutType() {
-        case .dwindle:
-            _ = controller?.dwindleLayoutHandler.wrapGroupFocus(direction: direction)
-        case .niri,
-             .defaultLayout:
-            if direction == .down {
-                focusWindowDownOrTopInNiri()
-            } else if direction == .up {
-                focusWindowUpOrBottomInNiri()
-            }
+        if direction == .down {
+            focusWindowDownOrTopInNiri()
+        } else if direction == .up {
+            focusWindowUpOrBottomInNiri()
         }
     }
 
     private func toggleFullscreen() {
-        switch currentLayoutType() {
-        case .dwindle:
-            controller?.dwindleLayoutHandler.toggleFullscreen()
-        case .niri,
-             .defaultLayout:
-            controller?.niriLayoutHandler.toggleFullscreen()
-        }
+        controller?.niriLayoutHandler.toggleFullscreen()
     }
 
     private func moveWindowInNiri(direction: Direction) -> WindowMoveOutcome {
@@ -854,130 +774,5 @@ final class CommandHandler {
                 }
             }
         }
-    }
-
-    private func currentLayoutType() -> LayoutType {
-        guard let controller else { return .niri }
-        guard let ws = controller.activeWorkspace() else { return .niri }
-        return controller.settings.layoutType(for: ws.name)
-    }
-
-    private func moveToRootInDwindle() {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            let stable = controller.settings.dwindleMoveToRootStable
-            if engine.moveSelectionToRoot(stable: stable, in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.windowMovedToRoot, in: wsId)
-            }
-            controller.layoutRefreshController.requestLayoutCommandRelayout(
-                affectedWorkspaceIds: [wsId]
-            )
-        }
-    }
-
-    private func toggleSplitInDwindle() {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            if engine.toggleOrientation(in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.splitOrientationToggled, in: wsId)
-            }
-            controller.layoutRefreshController.requestLayoutCommandRelayout(
-                affectedWorkspaceIds: [wsId]
-            )
-        }
-    }
-
-    private func swapSplitInDwindle() {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            if engine.swapSplit(in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.splitSwapped, in: wsId)
-            }
-            controller.layoutRefreshController.requestLayoutCommandRelayout(
-                affectedWorkspaceIds: [wsId]
-            )
-        }
-    }
-
-    private func resizeAlongAxisInDwindle(orientation: DwindleOrientation, grow: Bool) {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            let delta = grow ? engine.settings.resizeStep : -engine.settings.resizeStep
-            if engine.resizeSelected(by: delta, orientation: orientation, in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.splitRatioChanged, in: wsId)
-            }
-            controller.layoutRefreshController.requestLayoutCommandRelayout(
-                affectedWorkspaceIds: [wsId]
-            )
-        }
-    }
-
-    private func resizeFocusedWindowInDwindle(grow: Bool) {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            let delta = grow ? engine.settings.resizeStep : -engine.settings.resizeStep
-            if engine.resizeFocusedWindow(by: delta, in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.splitRatioChanged, in: wsId)
-            }
-            controller.layoutRefreshController.requestLayoutCommandRelayout(
-                affectedWorkspaceIds: [wsId]
-            )
-        }
-    }
-
-    private func preselectInDwindle(direction: Direction) {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            if engine.setPreselection(direction, in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.preselectionChanged, in: wsId)
-            }
-        }
-    }
-
-    private func clearPreselectInDwindle() {
-        guard let controller else { return }
-        controller.dwindleLayoutHandler.withDwindleContext { engine, wsId in
-            if engine.setPreselection(nil, in: wsId) {
-                controller.dwindleLayoutHandler.recordLayoutOperation(.preselectionChanged, in: wsId)
-            }
-        }
-    }
-
-    private func toggleWorkspaceLayout() {
-        guard let controller else { return }
-        guard let workspace = controller.activeWorkspace() else { return }
-        let workspaceName = workspace.name
-
-        let currentLayout = controller.settings.layoutType(for: workspaceName)
-
-        let newLayout: LayoutType = switch currentLayout {
-        case .niri,
-             .defaultLayout: .dwindle
-        case .dwindle: .niri
-        }
-
-        _ = setWorkspaceLayout(newLayout, forWorkspaceNamed: workspaceName)
-    }
-
-    @discardableResult
-    func setWorkspaceLayout(_ newLayout: LayoutType, forWorkspaceNamed workspaceName: String? = nil) -> Bool {
-        guard let controller else { return false }
-        let resolvedWorkspaceName = workspaceName ?? controller.activeWorkspace()?.name
-        guard let resolvedWorkspaceName else { return false }
-
-        var configs = controller.settings.workspaceConfigurations
-        guard let index = configs.firstIndex(where: { $0.name == resolvedWorkspaceName }) else { return false }
-
-        guard configs[index].layoutType != newLayout else { return false }
-
-        configs[index] = configs[index].with(layoutType: newLayout)
-        controller.settings.workspaceConfigurations = configs
-        controller.layoutRefreshController.requestRelayout(reason: .workspaceLayoutToggled)
-        if let ipcApplicationBridge = controller.ipcApplicationBridge {
-            Task {
-                await ipcApplicationBridge.publishEvent(.layoutChanged)
-            }
-        }
-        return true
     }
 }

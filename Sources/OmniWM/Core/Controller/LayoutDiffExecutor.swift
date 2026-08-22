@@ -10,13 +10,6 @@ final class LayoutDiffExecutor {
         let terminalRecoveryFrameUpdates: [AXFrameApplicationTarget]
     }
 
-    private struct DeferredRevealFrameUpdate {
-        let pid: pid_t
-        let windowId: Int
-        let frame: CGRect
-        let token: WindowToken
-    }
-
     private unowned let refreshController: LayoutRefreshController
 
     init(refreshController: LayoutRefreshController) {
@@ -83,14 +76,6 @@ final class LayoutDiffExecutor {
             }
         }
 
-        for change in diff.deferredHides {
-            hiddenTokens.insert(change.token)
-        }
-
-        func isDeferredReveal(_ token: WindowToken) -> Bool {
-            diff.deferredHides.contains { $0.revealToken == token }
-        }
-
         for restoreChange in diff.restoreChanges where !hiddenTokens.contains(restoreChange.token) {
             guard restoreTokens.insert(restoreChange.token).inserted,
                   let entry = resolveEntry(for: restoreChange.token)
@@ -102,7 +87,7 @@ final class LayoutDiffExecutor {
         }
 
         for (entry, hiddenState) in shownEntries
-            where !hiddenTokens.contains(entry.token) && !isDeferredReveal(entry.token)
+            where !hiddenTokens.contains(entry.token)
         {
             guard let hiddenState, restoreTokens.insert(entry.token).inserted else { continue }
             restoreEntries.append((entry, hiddenState))
@@ -205,7 +190,6 @@ final class LayoutDiffExecutor {
                 where !restoreTokens.contains(entry.token)
                 && pendingRevealTransactionIdsByToken[entry.token] == nil
                 && !blockedRevealTokens.contains(entry.token)
-                && !isDeferredReveal(entry.token)
             {
                 controller.workspaceManager.setHiddenState(nil, for: entry.token)
             }
@@ -245,8 +229,6 @@ final class LayoutDiffExecutor {
             transactionId: UInt64
         )] = []
         revealFrameUpdates.reserveCapacity(pendingRevealTransactionIdsByToken.count)
-        var deferredRevealFrameUpdates: [DeferredRevealFrameUpdate] = []
-        deferredRevealFrameUpdates.reserveCapacity(diff.deferredHides.count)
 
         for change in diff.frameChanges {
             guard !hiddenTokens.contains(change.token),
@@ -266,18 +248,6 @@ final class LayoutDiffExecutor {
             if let transactionId = pendingRevealTransactionIdsByToken[change.token] {
                 revealFrameUpdates.append((entry.pid, entry.axRef, change.frame, transactionId))
             } else {
-                if isDeferredReveal(change.token) {
-                    controller.axManager.forceApplyNextFrame(for: entry.windowId)
-                    deferredRevealFrameUpdates.append(
-                        DeferredRevealFrameUpdate(
-                            pid: entry.pid,
-                            windowId: entry.windowId,
-                            frame: change.frame,
-                            token: change.token
-                        )
-                    )
-                    continue
-                }
                 let forceNativeFullscreenRestoreApply = refreshController
                     .consumeNativeFullscreenRestoredFrameApply(for: change.token)
                 if change.forceApply {
@@ -304,14 +274,6 @@ final class LayoutDiffExecutor {
             terminalRecoveryFrameUpdates,
             workspaceId: plan.workspaceId,
             monitorId: monitor.id,
-            controller: controller
-        )
-
-        applyDeferredRevealFrames(
-            deferredRevealFrameUpdates,
-            deferredHides: diff.deferredHides,
-            plan: plan,
-            monitor: monitor,
             controller: controller
         )
 
@@ -346,9 +308,7 @@ final class LayoutDiffExecutor {
     }
 
     nonisolated static func isFrameOnly(_ diff: WorkspaceLayoutDiff) -> Bool {
-        diff.visibilityChanges.isEmpty &&
-            diff.restoreChanges.isEmpty &&
-            diff.deferredHides.isEmpty
+        diff.visibilityChanges.isEmpty && diff.restoreChanges.isEmpty
     }
 
     func prepareFrameOnlyUpdates(
@@ -409,38 +369,6 @@ final class LayoutDiffExecutor {
             monitorId: monitor.id,
             controller: controller
         )
-    }
-
-    private func applyDeferredRevealFrames(
-        _ updates: [DeferredRevealFrameUpdate],
-        deferredHides: [LayoutDeferredHide],
-        plan: WorkspaceLayoutPlan,
-        monitor: Monitor,
-        controller: WMController
-    ) {
-        guard !updates.isEmpty else { return }
-        for update in updates {
-            guard let entry = controller.workspaceManager.entry(for: update.token),
-                  let transactionId = refreshController.dwindleHandler.beginPendingGroupRevealTransaction(
-                      for: entry,
-                      targetFrame: update.frame,
-                      monitor: monitor,
-                      hides: deferredHides.filter { $0.revealToken == update.token },
-                      preserveWorkspaceInactive: !plan.isActiveWorkspace
-                  )
-            else {
-                continue
-            }
-            controller.axManager.applyFramesParallel(
-                [.init(pid: entry.pid, window: entry.axRef, frame: update.frame)],
-                terminalObserver: { [weak refreshController] result in
-                    refreshController?.dwindleHandler.completePendingGroupRevealTransaction(
-                        with: result,
-                        transactionId: transactionId
-                    )
-                }
-            )
-        }
     }
 
     private func applyFrameUpdates(

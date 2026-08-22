@@ -33,8 +33,6 @@ struct SettingsDetailView: View {
             DiagnosticsSettingsTab(controller: controller, navigation: navigation)
         case .niri:
             NiriSettingsTab(settings: settings, controller: controller)
-        case .dwindle:
-            DwindleSettingsTab(settings: settings, controller: controller)
         case .monitors:
             MonitorSettingsTab(
                 settings: settings,

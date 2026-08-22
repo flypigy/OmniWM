@@ -868,7 +868,6 @@ final class WorkspaceMoveIPCIntegrationTests: XCTestCase {
             )
             controller.layoutRefreshController.requestWindowRemoval(
                 workspaceId: fixture.centerWorkspaceId,
-                layoutType: .niri,
                 removedNodeId: nil,
                 removedNiriColumn: false,
                 niriOldFrames: [:],
@@ -912,7 +911,6 @@ final class WorkspaceMoveIPCIntegrationTests: XCTestCase {
             )
             controller.layoutRefreshController.requestWindowRemoval(
                 workspaceId: fixture.centerWorkspaceId,
-                layoutType: .niri,
                 removedNodeId: nil,
                 removedNiriColumn: false,
                 niriOldFrames: [:],

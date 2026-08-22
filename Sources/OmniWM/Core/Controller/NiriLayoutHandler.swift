@@ -444,12 +444,10 @@ enum StructuralMutationOutcome: Equatable {
         var plans: [WorkspaceLayoutPlan] = []
         let workspaceIds = activeWorkspaces.sorted(by: { $0.uuidString < $1.uuidString })
         for wsId in workspaceIds {
-            guard let workspace = controller.workspaceManager.descriptor(for: wsId),
+            guard controller.workspaceManager.descriptor(for: wsId) != nil,
                   let monitor = controller.workspaceManager.monitor(for: wsId)
             else { continue }
 
-            let layoutType = controller.settings.layoutType(for: workspace.name)
-            if layoutType == .dwindle { continue }
             let isActiveWorkspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)?.id == wsId
 
             guard let snapshot = makeWorkspaceSnapshot(
@@ -1346,8 +1344,7 @@ enum StructuralMutationOutcome: Equatable {
 
         var infos: [TabRailInfo] = []
         for monitor in controller.workspaceManager.monitors {
-            guard let workspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id),
-                  controller.workspaceManager.activeLayoutKind(for: workspace.id) == .niri
+            guard let workspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)
             else { continue }
 
             infos.append(contentsOf: niriTabRailInfos(
@@ -1449,7 +1446,6 @@ enum StructuralMutationOutcome: Equatable {
         guard let controller, let engine = controller.niriEngine else { return }
         guard case let .niriColumn(columnId) = info.owner else { return }
         let workspaceId = info.workspaceId
-        guard controller.workspaceManager.activeLayoutKind(for: workspaceId) == .niri else { return }
         guard controller.workspaceManager.isSeqCurrent(
             info.plannedSeq,
             for: workspaceId,
@@ -1892,7 +1888,6 @@ enum StructuralMutationOutcome: Equatable {
         guard let controller else { return }
         var changed: Set<WorkspaceDescriptor.ID> = []
         for descriptor in controller.workspaceManager.workspaces {
-            guard controller.settings.layoutType(for: descriptor.name) != .dwindle else { continue }
             withNiriWorkspaceContext(for: descriptor.id) {
                 engine, wsId, motion, state, _, workingFrame, gaps, orientation in
                 guard engine.balanceSizes(
@@ -2155,7 +2150,6 @@ enum StructuralMutationOutcome: Equatable {
     private func selectedWindowHandleInActiveWorkspace() -> WindowHandle? {
         guard let controller,
               let workspaceId = controller.activeWorkspace()?.id,
-              controller.workspaceManager.activeLayoutKind(for: workspaceId) == .niri,
               let engine = controller.niriEngine,
               let window = engine.projectedSelectedWindow(
                   state: controller.workspaceManager.niriViewportState(for: workspaceId),
@@ -2176,7 +2170,6 @@ enum StructuralMutationOutcome: Equatable {
               let entry = controller.workspaceManager.entry(for: handle.id),
               controller.workspaceManager.handle(for: handle.id) === handle,
               !controller.workspaceManager.isAppHidden(pid: entry.pid),
-              controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) == .niri,
               let engine = controller.niriEngine,
               !engine.isExcludedFromProjection(handle.id, in: entry.workspaceId),
               let windowNode = engine.findNode(for: handle, in: entry.workspaceId),

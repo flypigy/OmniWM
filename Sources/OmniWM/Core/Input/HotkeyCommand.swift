@@ -22,7 +22,6 @@ struct HotkeyInvocation: Equatable, Sendable {
 enum LayoutCompatibility: String {
     case shared = "Shared"
     case niri = "Niri"
-    case dwindle = "Dwindle"
 }
 
 enum HotkeyCommand: Codable, Equatable, Hashable {
@@ -89,13 +88,6 @@ enum HotkeyCommand: Codable, Equatable, Hashable {
     case swapWorkspaceWithMonitor(Direction)
 
     case balanceSizes
-    case moveToRoot
-    case toggleSplit
-    case swapSplit
-    case resizeAlongAxis(DwindleOrientation, Bool)
-    case resizeFocusedWindow(Bool)
-    case preselect(Direction)
-    case preselectClear
 
     case workspaceBackAndForth
     case focusWorkspaceAnywhere(Int)
@@ -111,7 +103,6 @@ enum HotkeyCommand: Codable, Equatable, Hashable {
 
     case toggleWorkspaceBarVisibility
     case toggleHiddenBarPanel
-    case toggleWorkspaceLayout
     case toggleOverview
     case toggleSystemStats
 

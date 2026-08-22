@@ -26,11 +26,6 @@ struct CubicConfig {
     }
 
     static let `default` = CubicConfig()
-    static let hyprlandDwindle = CubicConfig(
-        duration: 0.2,
-        controlPoint1: CGPoint(x: 0.23, y: 1.0),
-        controlPoint2: CGPoint(x: 0.32, y: 1.0)
-    )
 
     func value(at progress: Double) -> Double {
         let x = min(1.0, max(0.0, progress))

@@ -393,63 +393,6 @@ final class FloatingMonitorRebindFocusTests: XCTestCase {
         XCTAssertEqual(manager.invariantViolationCountsDump(), "clean")
     }
 
-    func testBackgroundDwindleRebindPreservesValidSourceFloatingMRU() throws {
-        let fixture = try makeFixture(sourceLayout: .dwindle)
-        let controller = fixture.controller
-        let manager = controller.workspaceManager
-        let engine = DwindleLayoutEngine()
-        engine.animationClock = controller.animationClock
-        controller.dwindleEngine = engine
-        let tiled = manager.addWindow(
-            AXWindowRef(element: AXUIElementCreateApplication(489_008), windowId: 1),
-            pid: 489_008,
-            windowId: 1,
-            to: fixture.sourceWorkspaceId
-        )
-        manager.withEngineMutationScope(in: fixture.sourceWorkspaceId) {
-            _ = engine.addWindow(
-                token: tiled,
-                to: fixture.sourceWorkspaceId,
-                activeWindowFrame: nil
-            )
-        }
-        let rememberedFloating = addFloatingWindow(
-            pid: 489_008,
-            windowId: 2,
-            to: fixture.sourceWorkspaceId,
-            controller: controller
-        )
-        let moving = addFloatingWindow(
-            pid: 489_008,
-            windowId: 3,
-            to: fixture.sourceWorkspaceId,
-            controller: controller
-        )
-        XCTAssertTrue(
-            manager.setManagedFocus(
-                rememberedFloating,
-                in: fixture.sourceWorkspaceId,
-                onMonitor: fixture.sourceMonitor.id
-            )
-        )
-        XCTAssertEqual(engine.selectedNode(in: fixture.sourceWorkspaceId)?.windowToken, tiled)
-
-        rebind(moving, fixture: fixture)
-
-        XCTAssertEqual(manager.workspace(for: moving), fixture.targetWorkspaceId)
-        XCTAssertEqual(manager.focusedToken, rememberedFloating)
-        XCTAssertEqual(manager.interactionMonitorId, fixture.sourceMonitor.id)
-        XCTAssertEqual(
-            manager.lastFloatingFocusedToken(in: fixture.sourceWorkspaceId),
-            rememberedFloating
-        )
-        XCTAssertEqual(
-            resolvedFocus(in: fixture.sourceWorkspaceId, manager: manager),
-            rememberedFloating
-        )
-        XCTAssertEqual(manager.invariantViolationCountsDump(), "clean")
-    }
-
     func testFloatingMembershipUsesCenterForResizeBoundaryAndOffscreenFrames() throws {
         let fixture = try makeFixture()
         let manager = fixture.controller.workspaceManager

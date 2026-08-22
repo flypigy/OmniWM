@@ -34,16 +34,11 @@ enum LayoutOperation: Equatable {
     case groupMembershipChanged(token: WindowToken)
     case interactiveMoveEnded(token: WindowToken)
     case interactiveResizeEnded(token: WindowToken)
-    case preselectionChanged
     case sizesBalanced
-    case splitOrientationToggled
-    case splitRatioChanged
-    case splitSwapped
     case tabActivated(token: WindowToken)
     case windowConsumedOrExpelled(token: WindowToken)
     case windowInserted(token: WindowToken)
     case windowMovedInColumn(token: WindowToken)
-    case windowMovedToRoot
     case windowMovedToWorkspace(token: WindowToken, to: WorkspaceDescriptor.ID)
     case windowSizeChanged(token: WindowToken)
     case windowsSwapped
@@ -68,16 +63,8 @@ enum LayoutOperation: Equatable {
             "interactive_move_ended token=\(token)"
         case let .interactiveResizeEnded(token):
             "interactive_resize_ended token=\(token)"
-        case .preselectionChanged:
-            "preselection_changed"
         case .sizesBalanced:
             "sizes_balanced"
-        case .splitOrientationToggled:
-            "split_orientation_toggled"
-        case .splitRatioChanged:
-            "split_ratio_changed"
-        case .splitSwapped:
-            "split_swapped"
         case let .tabActivated(token):
             "tab_activated token=\(token)"
         case let .windowConsumedOrExpelled(token):
@@ -86,8 +73,6 @@ enum LayoutOperation: Equatable {
             "window_inserted token=\(token)"
         case let .windowMovedInColumn(token):
             "window_moved_in_column token=\(token)"
-        case .windowMovedToRoot:
-            "window_moved_to_root"
         case let .windowMovedToWorkspace(token, to):
             "window_moved_to_workspace token=\(token) to=\(to.uuidString)"
         case let .windowSizeChanged(token):

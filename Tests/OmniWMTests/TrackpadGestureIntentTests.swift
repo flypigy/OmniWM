@@ -40,7 +40,7 @@ final class TrackpadGestureIntentTests: XCTestCase {
         XCTAssertTrue(TrackpadGestureIntent.allowsGestureStart(config, fingerCount: 4))
     }
 
-    func testCandidateModeRejectsColumnOnlyCountOverDwindleContext() {
+    func testCandidateModeRejectsColumnOnlyCountWithoutColumnContext() {
         let config = makeConfig(workspaceEnabled: false)
         XCTAssertFalse(TrackpadGestureIntent.hasCandidateMode(config, fingerCount: 3, columnContextAvailable: false))
         XCTAssertTrue(TrackpadGestureIntent.hasCandidateMode(config, fingerCount: 3, columnContextAvailable: true))

@@ -151,24 +151,10 @@ final class WorkspaceNavigationHandler {
 
     private func restoreRememberedSelection(in workspaceId: WorkspaceDescriptor.ID) {
         guard let controller,
-              let token = controller.workspaceManager.lastFocusedToken(in: workspaceId)
+              let token = controller.workspaceManager.lastFocusedToken(in: workspaceId),
+              let node = controller.niriEngine?.findNode(for: token, in: workspaceId)
         else { return }
-
-        switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
-        case .niri:
-            guard let node = controller.niriEngine?.findNode(for: token, in: workspaceId) else { return }
-            commitWorkspaceSelection(nodeId: node.id, focusedToken: token, in: workspaceId)
-        case .dwindle:
-            guard let engine = controller.dwindleEngine,
-                  engine.findNode(for: token, in: workspaceId) != nil
-            else { return }
-            _ = controller.dwindleLayoutHandler.activateWindow(
-                token,
-                in: workspaceId,
-                layoutRefresh: false,
-                focusAfterLayout: false
-            )
-        }
+        commitWorkspaceSelection(nodeId: node.id, focusedToken: token, in: workspaceId)
     }
 
     private func transferredWindowNiriViewportState(
@@ -176,7 +162,6 @@ final class WorkspaceNavigationHandler {
         workspaceId: WorkspaceDescriptor.ID
     ) -> ViewportState? {
         guard let controller else { return nil }
-        guard controller.workspaceManager.activeLayoutKind(for: workspaceId) == .niri else { return nil }
         guard let engine = controller.niriEngine,
               let movedNode = engine.findNode(for: token, in: workspaceId),
               let monitor = controller.workspaceManager.monitor(for: workspaceId)
@@ -304,14 +289,9 @@ final class WorkspaceNavigationHandler {
 
         let sourceFrame = controller.workspaceManager.focusedToken
             .flatMap { controller.preferredKeyboardFocusFrame(for: $0) }
-        let dwindleEngine = controller.workspaceManager.activeLayoutKind(for: targetWorkspace.id) == .dwindle
-            ? controller.dwindleEngine
-            : nil
         let candidates = controller.workspaceManager.tiledEntries(in: targetWorkspace.id)
             .compactMap { entry -> (token: WindowToken, frame: CGRect)? in
-                if controller.isManagedWindowSuppressedByMacOSHide(entry.token)
-                    || dwindleEngine?.isInactiveGroupMember(entry.token, in: targetWorkspace.id) == true
-                {
+                if controller.isManagedWindowSuppressedByMacOSHide(entry.token) {
                     return nil
                 }
                 return controller.preferredKeyboardFocusFrame(for: entry.token).map {
@@ -372,8 +352,7 @@ final class WorkspaceNavigationHandler {
             return .unchanged
         }
 
-        let targetIsNiri = controller.workspaceManager.activeLayoutKind(for: targetWorkspace.id) == .niri
-        let anchorToken: WindowToken? = targetIsNiri ? Self.spatialNeighborToken(
+        let anchorToken: WindowToken? = Self.spatialNeighborToken(
             from: controller.preferredKeyboardFocusFrame(for: handle.id),
             candidates: controller.workspaceManager.tiledEntries(in: targetWorkspace.id)
                 .filter { !controller.isManagedWindowSuppressedByMacOSHide($0.token) }
@@ -382,14 +361,12 @@ final class WorkspaceNavigationHandler {
                 },
             direction: direction,
             targetFrame: controller.insetWorkingFrame(for: targetMonitor)
-        ) : nil
+        )
 
         let outcome = moveWindow(handle: handle, toWorkspaceId: targetWorkspace.id)
         guard case let .changed(mutation) = outcome else { return outcome }
 
-        if targetIsNiri,
-           controller.niriEngine?.findNode(for: handle, in: targetWorkspace.id) != nil
-        {
+        if controller.niriEngine?.findNode(for: handle, in: targetWorkspace.id) != nil {
             controller.niriLayoutHandler.consumeTransferredWindow(
                 handle.id,
                 in: targetWorkspace.id,
@@ -622,7 +599,6 @@ final class WorkspaceNavigationHandler {
 
     func saveNiriViewportState(for workspaceId: WorkspaceDescriptor.ID) {
         guard let controller else { return }
-        guard controller.workspaceManager.activeLayoutKind(for: workspaceId) == .niri else { return }
         guard let engine = controller.niriEngine else { return }
 
         if let focusedToken = controller.workspaceManager.focusedToken,
@@ -702,8 +678,7 @@ final class WorkspaceNavigationHandler {
     private func resolveOrCreateAdjacentWorkspace(
         from workspaceId: WorkspaceDescriptor.ID,
         direction: Direction,
-        on monitorId: Monitor.ID,
-        requiredLayoutKind: ActiveLayoutKind? = nil
+        on monitorId: Monitor.ID
     ) -> WorkspaceDescriptor? {
         guard let controller else { return nil }
         let wm = controller.workspaceManager
@@ -723,9 +698,6 @@ final class WorkspaceNavigationHandler {
         while candidateNumber > 0 {
             let candidateName = String(candidateNumber)
             if wm.workspaceId(named: candidateName) == nil {
-                let candidateLayoutKind: ActiveLayoutKind = controller.settings.layoutType(for: candidateName)
-                    == .dwindle ? .dwindle : .niri
-                guard requiredLayoutKind == nil || candidateLayoutKind == requiredLayoutKind else { return nil }
                 guard let workspace = wm.createDynamicWorkspace(named: candidateName, on: monitorId) else {
                     return nil
                 }
@@ -748,13 +720,6 @@ final class WorkspaceNavigationHandler {
         guard let controller else {
             return WindowTransferResult(succeeded: false, newSourceFocusToken: nil)
         }
-        let sourceLayout: LayoutType = sourceWsId
-            .flatMap { controller.workspaceManager.descriptor(for: $0)?.name }
-            .map { controller.settings.layoutType(for: $0) } ?? .defaultLayout
-        let targetLayout: LayoutType = controller.workspaceManager.descriptor(for: targetWsId)
-            .map { controller.settings.layoutType(for: $0.name) } ?? .defaultLayout
-        let sourceIsDwindle = sourceLayout == .dwindle
-        let targetIsDwindle = targetLayout == .dwindle
         var newSourceFocusToken: WindowToken?
         var movedWithNiri = false
 
@@ -766,9 +731,7 @@ final class WorkspaceNavigationHandler {
             return WindowTransferResult(succeeded: true, newSourceFocusToken: nil)
         }
 
-        if !sourceIsDwindle,
-           !targetIsDwindle,
-           let sourceWsId,
+        if let sourceWsId,
            let engine = controller.niriEngine,
            let windowNode = engine.findNode(for: token, in: sourceWsId)
         {
@@ -796,7 +759,6 @@ final class WorkspaceNavigationHandler {
         }
 
         if !movedWithNiri,
-           !sourceIsDwindle,
            let sourceWsId,
            let engine = controller.niriEngine
         {
@@ -808,11 +770,6 @@ final class WorkspaceNavigationHandler {
                         removing: currentNode.id,
                         in: sourceWsId
                     )
-                }
-
-                if targetIsDwindle, engine.findNode(for: token, in: sourceWsId) != nil {
-                    controller.workspaceManager.captureDetachedNiriPlacement(for: token, in: sourceWsId)
-                    engine.removeWindow(token: token, in: sourceWsId)
                 }
 
                 if let selectedId = sourceState.selectedNodeId,
@@ -827,26 +784,9 @@ final class WorkspaceNavigationHandler {
                     newSourceFocusToken = selectedNode.token
                 }
             }
-        } else if sourceIsDwindle,
-                  let sourceWsId,
-                  let dwindleEngine = controller.dwindleEngine
-        {
-            newSourceFocusToken = controller.workspaceManager.withEngineMutationScope(in: sourceWsId) {
-                dwindleEngine.removeWindow(token: token, from: sourceWsId)
-                return dwindleEngine.selectedNode(in: sourceWsId)?.windowToken
-            }
         }
 
-        let succeeded: Bool
-        if movedWithNiri {
-            succeeded = true
-        } else if sourceWsId == nil {
-            succeeded = true
-        } else if !sourceIsDwindle && !targetIsDwindle {
-            succeeded = false
-        } else {
-            succeeded = true
-        }
+        let succeeded = movedWithNiri || sourceWsId == nil
 
         if succeeded {
             if !movedWithNiri {
@@ -1096,12 +1036,7 @@ final class WorkspaceNavigationHandler {
         if controller.workspaceManager.windowMode(for: handle.id) == .floating {
             return true
         }
-        switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
-        case .niri:
-            return controller.niriEngine?.findNode(for: handle, in: workspaceId) != nil
-        case .dwindle:
-            return controller.dwindleEngine?.findNode(for: handle.id, in: workspaceId) != nil
-        }
+        return controller.niriEngine?.findNode(for: handle, in: workspaceId) != nil
     }
 
     func moveColumn(
@@ -1113,8 +1048,6 @@ final class WorkspaceNavigationHandler {
               !controller.workspaceManager.isAppHidden(handle.id),
               let sourceWorkspaceId = controller.workspaceManager.workspace(for: handle.id),
               sourceWorkspaceId != targetWorkspaceId,
-              controller.workspaceManager.activeLayoutKind(for: sourceWorkspaceId) == .niri,
-              controller.workspaceManager.activeLayoutKind(for: targetWorkspaceId) == .niri,
               let targetMonitor = controller.workspaceManager.monitorForWorkspace(targetWorkspaceId),
               let windowNode = engine.findNode(for: handle, in: sourceWorkspaceId),
               let column = engine.findColumn(containing: windowNode, in: sourceWorkspaceId)
@@ -1198,15 +1131,13 @@ final class WorkspaceNavigationHandler {
         guard direction == .up || direction == .down,
               let controller,
               let sourceWorkspaceId = controller.workspaceManager.workspace(for: handle.id),
-              controller.workspaceManager.activeLayoutKind(for: sourceWorkspaceId) == .niri,
               let sourceNode = controller.niriEngine?.findNode(for: handle, in: sourceWorkspaceId),
               controller.niriEngine?.findColumn(containing: sourceNode, in: sourceWorkspaceId) != nil,
               let sourceMonitorId = controller.workspaceManager.monitorId(for: sourceWorkspaceId),
               let targetWorkspace = resolveOrCreateAdjacentWorkspace(
                   from: sourceWorkspaceId,
                   direction: direction,
-                  on: sourceMonitorId,
-                  requiredLayoutKind: .niri
+                  on: sourceMonitorId
               )
         else {
             return .unchanged

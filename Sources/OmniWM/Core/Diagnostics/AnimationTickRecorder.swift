@@ -11,7 +11,6 @@ enum AnimationTickTrace {
         let intervalMs: Double
         let expectedMs: Double
         let scrollMs: Double
-        let dwindleMs: Double
         let closingMs: Double
         let reconcileMs: Double
         let totalMs: Double
@@ -23,12 +22,11 @@ enum AnimationTickTrace {
         capacity: 2048
     ) { record in
         let timing = String(
-            format: "interval=%.2fms expected=%.2fms scroll=%.2fms dwindle=%.2fms"
+            format: "interval=%.2fms expected=%.2fms scroll=%.2fms"
                 + " closing=%.2fms reconcile=%.2fms total=%.2fms",
             record.intervalMs,
             record.expectedMs,
             record.scrollMs,
-            record.dwindleMs,
             record.closingMs,
             record.reconcileMs,
             record.totalMs

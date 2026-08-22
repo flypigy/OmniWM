@@ -577,12 +577,6 @@ enum CLICompletionGenerator {
         switch kind {
         case .direction:
             return ["left", "right", "up", "down"]
-        case .layout:
-            return ["default", "niri", "dwindle"]
-        case .resizeAxis:
-            return ["horizontal", "vertical"]
-        case .resizeOperation:
-            return ["grow", "shrink"]
         case .workspaceNumber,
              .columnIndex,
              .windowIndex,

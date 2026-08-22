@@ -14,7 +14,6 @@ struct CanonicalTOMLConfig: Codable, Equatable {
     var routing: Routing
     var gaps: Gaps
     var niri: Niri
-    var dwindle: Dwindle
     var borders: Borders
     var overview: Overview
     var workspaceBar: WorkspaceBar
@@ -29,7 +28,6 @@ struct CanonicalTOMLConfig: Codable, Equatable {
     var monitorBarOverrides: [MonitorBarSettings]
     var monitorOrientationOverrides: [MonitorOrientationSettings]
     var monitorNiriOverrides: [MonitorNiriSettings]
-    var monitorDwindleOverrides: [MonitorDwindleSettings]
     var monitorGapOverrides: [MonitorGapSettings]
     var monitorRoutingOverrides: [MonitorRoutingSettings]
 
@@ -83,15 +81,6 @@ struct CanonicalTOMLConfig: Codable, Equatable {
         var singleWindowFit: String
         var containerPrimarySpanPresets: [Double]?
         var defaultContainerPrimarySpan: Double?
-    }
-
-    struct Dwindle: Codable, Equatable {
-        var smartSplit: Bool
-        var defaultSplitRatio: Double
-        var splitWidthMultiplier: Double
-        var singleWindowFit: String
-        var useGlobalGaps: Bool
-        var moveToRootStable: Bool
     }
 
     struct Borders: Codable, Equatable {
@@ -312,12 +301,6 @@ extension CanonicalTOMLConfig {
         )
         gaps = try container.decode(Gaps.self, forKey: .gaps, default: defaults.gaps, recovering: recovering)
         niri = try container.decode(Niri.self, forKey: .niri, default: defaults.niri, recovering: recovering)
-        dwindle = try container.decode(
-            Dwindle.self,
-            forKey: .dwindle,
-            default: defaults.dwindle,
-            recovering: recovering
-        )
         borders = try container.decode(
             Borders.self,
             forKey: .borders,
@@ -401,12 +384,6 @@ extension CanonicalTOMLConfig {
             [MonitorNiriSettings].self,
             forKey: .monitorNiriOverrides,
             default: defaults.monitorNiriOverrides,
-            recovering: recovering
-        )
-        monitorDwindleOverrides = try container.decode(
-            [MonitorDwindleSettings].self,
-            forKey: .monitorDwindleOverrides,
-            default: defaults.monitorDwindleOverrides,
             recovering: recovering
         )
         monitorGapOverrides = try container.decode(
@@ -623,50 +600,6 @@ extension CanonicalTOMLConfig.Niri {
     }
 }
 
-extension CanonicalTOMLConfig.Dwindle {
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let recovering = decoder.recoversMissingSettingsTOMLKeys
-        let defaults = CanonicalTOMLConfig.recoveryDefaults().dwindle
-
-        smartSplit = try container.decode(
-            Bool.self,
-            forKey: .smartSplit,
-            default: defaults.smartSplit,
-            recovering: recovering
-        )
-        defaultSplitRatio = try container.decode(
-            Double.self,
-            forKey: .defaultSplitRatio,
-            default: defaults.defaultSplitRatio,
-            recovering: recovering
-        )
-        splitWidthMultiplier = try container.decode(
-            Double.self,
-            forKey: .splitWidthMultiplier,
-            default: defaults.splitWidthMultiplier,
-            recovering: recovering
-        )
-        singleWindowFit = try container.decode(
-            String.self,
-            forKey: .singleWindowFit,
-            default: defaults.singleWindowFit,
-            recovering: recovering
-        )
-        useGlobalGaps = try container.decode(
-            Bool.self,
-            forKey: .useGlobalGaps,
-            default: defaults.useGlobalGaps,
-            recovering: recovering
-        )
-        moveToRootStable = try container.decode(
-            Bool.self,
-            forKey: .moveToRootStable,
-            default: defaults.moveToRootStable,
-            recovering: recovering
-        )
-    }
-}
 
 extension CanonicalTOMLConfig.Borders {
     init(from decoder: Decoder) throws {
@@ -1110,14 +1043,6 @@ extension CanonicalTOMLConfig {
             containerPrimarySpanPresets: export.niriContainerPrimarySpanPresets,
             defaultContainerPrimarySpan: export.niriDefaultContainerPrimarySpan
         )
-        dwindle = Dwindle(
-            smartSplit: export.dwindleSmartSplit,
-            defaultSplitRatio: export.dwindleDefaultSplitRatio,
-            splitWidthMultiplier: export.dwindleSplitWidthMultiplier,
-            singleWindowFit: export.dwindleSingleWindowFit,
-            useGlobalGaps: export.dwindleUseGlobalGaps,
-            moveToRootStable: export.dwindleMoveToRootStable
-        )
         borders = Borders(
             enabled: export.bordersEnabled,
             width: export.borderWidth,
@@ -1196,7 +1121,6 @@ extension CanonicalTOMLConfig {
         monitorBarOverrides = export.monitorBarSettings
         monitorOrientationOverrides = export.monitorOrientationSettings
         monitorNiriOverrides = export.monitorNiriSettings
-        monitorDwindleOverrides = export.monitorDwindleSettings
         monitorGapOverrides = export.monitorGapSettings
         monitorRoutingOverrides = export.monitorRoutingSettings
     }
@@ -1268,13 +1192,6 @@ extension CanonicalTOMLConfig {
             appRules: appRules,
             monitorOrientationSettings: monitorOrientationOverrides,
             monitorNiriSettings: monitorNiriOverrides,
-            dwindleSmartSplit: dwindle.smartSplit,
-            dwindleDefaultSplitRatio: dwindle.defaultSplitRatio,
-            dwindleSplitWidthMultiplier: dwindle.splitWidthMultiplier,
-            dwindleSingleWindowFit: dwindle.singleWindowFit,
-            dwindleUseGlobalGaps: dwindle.useGlobalGaps,
-            dwindleMoveToRootStable: dwindle.moveToRootStable,
-            monitorDwindleSettings: monitorDwindleOverrides,
             monitorGapSettings: monitorGapOverrides,
             preventSleepEnabled: general.preventSleepEnabled,
             updateChecksEnabled: general.updateChecksEnabled,

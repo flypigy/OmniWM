@@ -7,7 +7,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case diagnostics
     case niri
-    case dwindle
     case monitors
     case workspaces
     case overview
@@ -27,7 +26,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: "General"
         case .diagnostics: "Troubleshooting"
         case .niri: "Niri Layout"
-        case .dwindle: "Dwindle Layout"
         case .monitors: "Monitors"
         case .workspaces: "Workspaces"
         case .overview: "Overview"
@@ -45,7 +43,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: "gearshape"
         case .diagnostics: "stethoscope"
         case .niri: "scroll"
-        case .dwindle: "square.split.2x2"
         case .monitors: "display"
         case .workspaces: "rectangle.3.group"
         case .overview: "rectangle.grid.2x2"
@@ -75,7 +72,7 @@ enum SettingsSectionGroup: String, CaseIterable, Identifiable {
         case .basics:
             [.general]
         case .layouts:
-            [.niri, .dwindle, .monitors]
+            [.niri, .monitors]
         case .workspace:
             [.workspaces, .overview, .borders, .bar, .hiddenBar]
         case .input:

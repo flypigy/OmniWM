@@ -173,13 +173,13 @@ final class IssueReporterTests: XCTestCase {
         model.title = "Bug"
         model.actual = "It crashed"
         model.category = .crash
-        model.layout = .dwindle
+        model.layout = .niri
         model.regression = .yes
         model.regressionVersion = "0.4.6"
         let composed = model.submissionBody
         XCTAssertTrue(composed.contains("## What happened\nIt crashed"))
         XCTAssertTrue(composed.contains("Crash"))
-        XCTAssertTrue(composed.contains("Dwindle"))
+        XCTAssertTrue(composed.contains("Niri"))
         XCTAssertTrue(composed.contains("0.4.6"))
         XCTAssertFalse(composed.contains("## Expected behavior"))
     }
@@ -208,7 +208,7 @@ final class IssueReporterTests: XCTestCase {
             repro: "Open app",
             affectedApps: "Safari",
             category: IssueCategory.crash.rawValue,
-            layout: LayoutType.dwindle.rawValue,
+            layout: LayoutType.niri.rawValue,
             regression: IssueRegression.yes.rawValue,
             regressionVersion: "0.4.6",
             polishedBody: "## What happened\nIt crashed"

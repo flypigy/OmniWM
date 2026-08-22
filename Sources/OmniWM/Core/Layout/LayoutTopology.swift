@@ -3,11 +3,6 @@
 
 import Foundation
 
-enum ActiveLayoutKind: Equatable {
-    case niri
-    case dwindle
-}
-
 struct LayoutTopology: Equatable {
     struct Tile: Equatable {
         let nodeId: NodeId
@@ -20,7 +15,6 @@ struct LayoutTopology: Equatable {
     }
 
     var columns: [Column] = []
-    var dwindleFullscreenTokens: Set<WindowToken> = []
 }
 
 extension LayoutTopology {
@@ -44,10 +38,7 @@ extension LayoutTopology {
     }
 
     func isFullscreen(_ token: WindowToken) -> Bool {
-        if dwindleFullscreenTokens.contains(token) {
-            return true
-        }
-        return columns.contains { column in
+        columns.contains { column in
             column.tiles.contains { $0.token == token && $0.isFullscreen }
         }
     }

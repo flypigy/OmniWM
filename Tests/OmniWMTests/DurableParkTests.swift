@@ -652,15 +652,10 @@ final class DurableParkTests: XCTestCase {
         )
     }
 
-    func testNiriAndDwindleTerminalLayoutTransientHidesCoverTiledAndFloatingWindows() throws {
-        let cases: [(usesDwindle: Bool, mode: TrackedWindowMode)] = [
-            (false, .tiling),
-            (false, .floating),
-            (true, .tiling),
-            (true, .floating)
-        ]
+    func testNiriTerminalLayoutTransientHidesCoverTiledAndFloatingWindows() throws {
+        let cases: [TrackedWindowMode] = [.tiling, .floating]
 
-        for (index, testCase) in cases.enumerated() {
+        for (index, mode) in cases.enumerated() {
             let controller = Self.controller()
             let monitor = Self.monitor()
             controller.workspaceManager.applyMonitorConfigurationChange([monitor])
@@ -668,11 +663,7 @@ final class DurableParkTests: XCTestCase {
                 controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
             )
             _ = controller.workspaceManager.focusWorkspace(named: "1")
-            if testCase.usesDwindle {
-                controller.dwindleLayoutHandler.enableDwindleLayout()
-            } else {
-                controller.niriLayoutHandler.enableNiriLayout()
-            }
+            controller.niriLayoutHandler.enableNiriLayout()
 
             let pid = pid_t(960_001 + index)
             let windowId = 960_101 + index
@@ -681,23 +672,15 @@ final class DurableParkTests: XCTestCase {
                 pid: pid,
                 windowId: windowId,
                 to: workspaceId,
-                mode: testCase.mode
+                mode: mode
             )
-            if testCase.mode == .tiling {
+            if mode == .tiling {
                 controller.workspaceManager.withEngineMutationScope {
-                    if testCase.usesDwindle {
-                        _ = controller.dwindleEngine?.addWindow(
-                            token: token,
-                            to: workspaceId,
-                            activeWindowFrame: nil
-                        )
-                    } else {
-                        _ = controller.niriEngine?.addWindow(
-                            token: token,
-                            to: workspaceId,
-                            afterSelection: nil
-                        )
-                    }
+                    _ = controller.niriEngine?.addWindow(
+                        token: token,
+                        to: workspaceId,
+                        afterSelection: nil
+                    )
                 }
             }
             let frame = CGRect(x: 100, y: 16, width: 800, height: 600)
@@ -717,7 +700,7 @@ final class DurableParkTests: XCTestCase {
             let trace = FrameApplyTrace.shared.dump()
             FrameApplyTrace.shared.endCapture()
 
-            let label = "\(testCase.usesDwindle ? "Dwindle" : "Niri")/\(testCase.mode)"
+            let label = "Niri/\(mode)"
             XCTAssertTrue(executed, label)
             XCTAssertEqual(
                 controller.workspaceManager.hiddenState(for: token)?.reason,

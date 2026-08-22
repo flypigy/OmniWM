@@ -64,12 +64,7 @@ struct WorldView {
 
     func isWindowFullscreenInLayout(_ token: WindowToken) -> Bool {
         guard let entry = controller.workspaceManager.entry(for: token) else { return false }
-        switch controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) {
-        case .dwindle:
-            return controller.dwindleEngine?.isWindowFullscreen(token, in: entry.workspaceId) == true
-        case .niri:
-            return controller.niriEngine?.isWindowFullscreen(token, in: entry.workspaceId) == true
-        }
+        return controller.niriEngine?.isWindowFullscreen(token, in: entry.workspaceId) == true
     }
 
     func isManagedWindowDisplayable(_ token: WindowToken) -> Bool {
@@ -81,9 +76,7 @@ struct WorldView {
     }
 
     func tabRailInfos() -> [TabRailInfo] {
-        var infos = controller.niriLayoutHandler.desiredTabRailInfos()
-        infos.append(contentsOf: controller.dwindleLayoutHandler.desiredTabRailInfos())
-        return infos
+        controller.niriLayoutHandler.desiredTabRailInfos()
     }
 
     func barSurfaces() -> [DesiredBarSurface] {

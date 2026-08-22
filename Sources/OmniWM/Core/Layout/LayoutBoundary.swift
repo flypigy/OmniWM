@@ -73,18 +73,6 @@ struct NiriWorkspaceSnapshot {
     let isActiveWorkspace: Bool
 }
 
-struct DwindleWorkspaceSnapshot {
-    let workspaceId: WorkspaceDescriptor.ID
-    let monitor: LayoutMonitorSnapshot
-    let windows: [LayoutWindowSnapshot]
-    let excludedTokens: Set<WindowToken>
-    let plannedSeq: UInt64
-    let preferredFocusToken: WindowToken?
-    let preferredHideSide: HideSide
-    let settings: ResolvedDwindleSettings
-    let isActiveWorkspace: Bool
-}
-
 struct LayoutFrameChange {
     let token: WindowToken
     let frame: CGRect
@@ -114,12 +102,6 @@ enum LayoutVisibilityChange {
     case hide(WindowToken, side: HideSide)
 }
 
-struct LayoutDeferredHide {
-    let token: WindowToken
-    let side: HideSide
-    let revealToken: WindowToken
-}
-
 struct NativeFullscreenSlotProjection: Equatable {
     let currentToken: WindowToken
     let frame: CGRect
@@ -132,7 +114,6 @@ struct WorkspaceLayoutDiff {
     var frameChanges: [LayoutFrameChange] = []
     var visibilityChanges: [LayoutVisibilityChange] = []
     var restoreChanges: [LayoutRestoreChange] = []
-    var deferredHides: [LayoutDeferredHide] = []
     var nativeFullscreenSlots: [WindowToken: NativeFullscreenSlotProjection] = [:]
 }
 
@@ -146,7 +127,6 @@ struct WorkspaceSessionPatch {
 enum AnimationDirective {
     case none
     case startNiriScroll(workspaceId: WorkspaceDescriptor.ID)
-    case startDwindleAnimation(workspaceId: WorkspaceDescriptor.ID, monitorId: Monitor.ID)
     case activateWindow(token: WindowToken)
 }
 

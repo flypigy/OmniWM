@@ -324,7 +324,6 @@ final class ServiceLifecycleManager {
 
         controller.workspaceManager.withEngineMutationScope {
             controller.niriEngine?.cleanupRemovedMonitor(monitorId)
-            controller.dwindleEngine?.cleanupRemovedMonitor(monitorId)
         }
     }
 

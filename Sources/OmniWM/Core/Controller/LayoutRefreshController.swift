@@ -25,7 +25,6 @@ import QuartzCore
 
     struct WindowRemovalPayload {
         var workspaceId: WorkspaceDescriptor.ID
-        let layoutType: LayoutType
         let removedNodeId: NodeId?
         let removedNiriColumn: Bool
         let niriOldFrames: [WindowToken: CGRect]
@@ -181,7 +180,6 @@ import QuartzCore
     }
 
     private(set) lazy var niriHandler = NiriLayoutHandler(controller: controller)
-    private(set) lazy var dwindleHandler = DwindleLayoutHandler(controller: controller)
     private lazy var diffExecutor = LayoutDiffExecutor(refreshController: self)
 
     var isDiscoveryInProgress: Bool {
@@ -243,7 +241,6 @@ import QuartzCore
         } else if let workspaceId = niriHandler.scrollAnimationByDisplay.removeValue(forKey: displayId) {
             controller?.workspaceManager.animationDriver.removeMotions(for: [workspaceId])
         }
-        dwindleHandler.dwindleAnimationByDisplay.removeValue(forKey: displayId)
     }
 
     private func detectRefreshRates() {
@@ -262,15 +259,12 @@ import QuartzCore
         let t0 = traceActive ? CACurrentMediaTime() : 0
         var t1: CFTimeInterval = 0
         var t2: CFTimeInterval = 0
-        var t3: CFTimeInterval = 0
 
         SkyLight.shared.withTransactionScope {
             niriHandler.tickScrollAnimation(targetTime: displayLink.targetTimestamp, displayId: displayId)
             t1 = traceActive ? CACurrentMediaTime() : 0
-            dwindleHandler.tickDwindleAnimation(targetTime: displayLink.targetTimestamp, displayId: displayId)
-            t2 = traceActive ? CACurrentMediaTime() : 0
             tickClosingAnimations(targetTime: displayLink.targetTimestamp, displayId: displayId)
-            t3 = traceActive ? CACurrentMediaTime() : 0
+            t2 = traceActive ? CACurrentMediaTime() : 0
             controller?.surfaceReconciler.reconcileAnimationTick()
         }
 
@@ -294,9 +288,8 @@ import QuartzCore
                 intervalMs: intervalMs,
                 expectedMs: expectedMs,
                 scrollMs: (t1 - t0) * 1000,
-                dwindleMs: (t2 - t1) * 1000,
-                closingMs: (t3 - t2) * 1000,
-                reconcileMs: (t4 - t3) * 1000,
+                closingMs: (t2 - t1) * 1000,
+                reconcileMs: (t4 - t2) * 1000,
                 totalMs: totalMs,
                 dropped: dropped
             )
@@ -332,18 +325,6 @@ import QuartzCore
         niriHandler.scrollAnimationByDisplay.removeAll()
         for displayId in displayIds {
             stopDisplayLinkIfIdle(for: displayId)
-        }
-    }
-
-    func startDwindleAnimation(for workspaceId: WorkspaceDescriptor.ID, monitor: Monitor) {
-        guard controller?.motionPolicy.animationsEnabled != false else { return }
-        let targetDisplayId = monitor.displayId
-
-        guard dwindleHandler.registerDwindleAnimation(workspaceId, monitor: monitor, on: targetDisplayId)
-        else { return }
-
-        if let displayLink = getOrCreateDisplayLink(for: targetDisplayId) {
-            displayLink.add(to: .main, forMode: .common)
         }
     }
 
@@ -406,26 +387,8 @@ import QuartzCore
         }
     }
 
-    func stopDwindleAnimation(for displayId: CGDirectDisplayID) {
-        dwindleHandler.dwindleAnimationByDisplay.removeValue(forKey: displayId)
-        stopDisplayLinkIfIdle(for: displayId)
-    }
-
-    func stopAllDwindleAnimations() {
-        let displayIds = Array(dwindleHandler.dwindleAnimationByDisplay.keys)
-        dwindleHandler.dwindleAnimationByDisplay.removeAll()
-        for displayId in displayIds {
-            stopDisplayLinkIfIdle(for: displayId)
-        }
-    }
-
-    func hasDwindleAnimationRunning(in workspaceId: WorkspaceDescriptor.ID) -> Bool {
-        dwindleHandler.hasDwindleAnimationRunning(in: workspaceId)
-    }
-
     private func stopDisplayLinkIfIdle(for displayId: CGDirectDisplayID) {
         if niriHandler.scrollAnimationByDisplay[displayId] == nil,
-           dwindleHandler.dwindleAnimationByDisplay[displayId] == nil,
            layoutState.closingAnimationsByDisplay[displayId].map({ $0.isEmpty }) ?? true
         {
             // Idle display links must not remain cached after teardown.
@@ -457,25 +420,16 @@ import QuartzCore
             let wsId = workspace.id
             guard workspaceIds.contains(wsId) else { continue }
 
-            let layoutType = controller.settings.layoutType(for: workspace.name)
+            guard let engine = controller.niriEngine else { continue }
+            let state = controller.workspaceManager.niriViewportState(for: wsId)
 
-            switch layoutType {
-            case .niri,
-                 .defaultLayout:
-                guard let engine = controller.niriEngine else { continue }
-                let state = controller.workspaceManager.niriViewportState(for: wsId)
-
-                niriHandler.applyFramesOnDemand(
-                    wsId: wsId,
-                    state: state,
-                    engine: engine,
-                    monitor: monitor,
-                    animationTime: nil
-                )
-
-            case .dwindle:
-                dwindleHandler.applyFramesOnDemand(workspaceId: wsId, monitor: monitor)
-            }
+            niriHandler.applyFramesOnDemand(
+                wsId: wsId,
+                state: state,
+                engine: engine,
+                monitor: monitor,
+                animationTime: nil
+            )
         }
 
         let preferredSides = preferredHideSides(for: controller.workspaceManager.monitors)
@@ -811,9 +765,6 @@ import QuartzCore
                 continue
             case let .startNiriScroll(workspaceId):
                 startScrollAnimation(for: workspaceId)
-            case let .startDwindleAnimation(workspaceId, monitorId):
-                guard let monitor = controller.workspaceManager.monitor(byId: monitorId) else { continue }
-                startDwindleAnimation(for: workspaceId, monitor: monitor)
             case let .activateWindow(token):
                 guard !suppressWindowActivation,
                       !controller.shouldSuppressManagedFocusRecovery,
@@ -905,13 +856,6 @@ import QuartzCore
         )
     }
 
-    func renderDwindleInteractiveResize(for workspaceId: WorkspaceDescriptor.ID) {
-        guard let controller,
-              let monitor = controller.workspaceManager.monitor(for: workspaceId)
-        else { return }
-        _ = dwindleHandler.applyFramesOnDemand(workspaceId: workspaceId, monitor: monitor)
-    }
-
     func requestLayoutCommandRelayout(
         affectedWorkspaceIds: Set<WorkspaceDescriptor.ID>,
         postLayout: PostLayoutAction? = nil,
@@ -952,7 +896,6 @@ import QuartzCore
 
     func requestWindowRemoval(
         workspaceId: WorkspaceDescriptor.ID,
-        layoutType: LayoutType,
         removedNodeId: NodeId?,
         removedNiriColumn: Bool,
         niriOldFrames: [WindowToken: CGRect],
@@ -968,7 +911,6 @@ import QuartzCore
                 postLayout: makePostLayoutAction(postLayout, workspaceIds: [workspaceId]),
                 windowRemovalPayload: .init(
                     workspaceId: workspaceId,
-                    layoutType: layoutType,
                     removedNodeId: removedNodeId,
                     removedNiriColumn: removedNiriColumn,
                     niriOldFrames: niriOldFrames,
@@ -1061,9 +1003,7 @@ import QuartzCore
             if layoutState.isIncrementalRefreshInProgress || layoutState.isImmediateLayoutInProgress {
                 return
             }
-            if !niriHandler.scrollAnimationByDisplay.isEmpty
-                || !dwindleHandler.dwindleAnimationByDisplay.isEmpty
-            {
+            if !niriHandler.scrollAnimationByDisplay.isEmpty {
                 return
             }
         }
@@ -1218,7 +1158,6 @@ import QuartzCore
         pendingRevealVerificationTasksByWindowId.removeAll()
         pendingRevealTransactionsByWindowId.removeAll()
         nextPendingRevealTransactionId = 1
-        dwindleHandler.resetPendingGroupReveals()
         nativeFullscreenRestoredFrameApplyTokens.removeAll()
 
         for (_, link) in layoutState.displayLinksByDisplay {
@@ -1226,7 +1165,6 @@ import QuartzCore
         }
         layoutState.displayLinksByDisplay.removeAll()
         niriHandler.scrollAnimationByDisplay.removeAll()
-        dwindleHandler.dwindleAnimationByDisplay.removeAll()
         layoutState.closingAnimationsByDisplay.removeAll()
         closingAnimationIdsByObjectId.removeAll(keepingCapacity: true)
         lastSubmittedClosingFramesByAnimationId.removeAll(keepingCapacity: true)
@@ -1322,23 +1260,12 @@ import QuartzCore
             effects.visibility = .init()
             return EffectPlan(effects: effects)
         }
-        let (niriWorkspaces, dwindleWorkspaces) = partitionWorkspacesByLayoutType(layoutWorkspaceIds)
 
         let workspacePlans = buildWorkspacePlansInBatch {
-            var plans: [WorkspaceLayoutPlan] = []
-            plans.reserveCapacity(niriWorkspaces.count + dwindleWorkspaces.count)
-            if !niriWorkspaces.isEmpty {
-                plans.append(contentsOf: self.niriHandler.layoutWithNiriEngine(
-                    activeWorkspaces: niriWorkspaces,
-                    useScrollAnimationPath: useScrollAnimationPath
-                ))
-            }
-            if !dwindleWorkspaces.isEmpty {
-                plans.append(
-                    contentsOf: self.dwindleHandler.layoutWithDwindleEngine(activeWorkspaces: dwindleWorkspaces)
-                )
-            }
-            return plans
+            self.niriHandler.layoutWithNiriEngine(
+                activeWorkspaces: layoutWorkspaceIds,
+                useScrollAnimationPath: useScrollAnimationPath
+            )
         }
 
         var effects = EffectPlanEffects()
@@ -1361,20 +1288,11 @@ import QuartzCore
     ) -> EffectPlan {
         guard let controller else { return .init() }
 
-        var dwindleWorkspaces: Set<WorkspaceDescriptor.ID> = []
         var focusedWorkspacesToRecover: Set<WorkspaceDescriptor.ID> = []
         var workspacesAllowingPreferredRecovery: Set<WorkspaceDescriptor.ID> = []
         let niriRemovalSeeds = makeNiriRemovalSeeds(from: payloads)
 
         for payload in payloads {
-            switch payload.layoutType {
-            case .dwindle:
-                dwindleWorkspaces.insert(payload.workspaceId)
-            case .niri,
-                 .defaultLayout:
-                break
-            }
-
             if payload.shouldRecoverFocus {
                 focusedWorkspacesToRecover.insert(payload.workspaceId)
             }
@@ -1384,21 +1302,13 @@ import QuartzCore
         }
 
         let workspacePlans = buildWorkspacePlansInBatch {
-            var plans: [WorkspaceLayoutPlan] = []
-            plans.reserveCapacity(dwindleWorkspaces.count + niriRemovalSeeds.count)
-            if !niriRemovalSeeds.isEmpty {
-                plans.append(contentsOf: self.niriHandler.layoutWithNiriEngine(
+            niriRemovalSeeds.isEmpty
+                ? []
+                : self.niriHandler.layoutWithNiriEngine(
                     activeWorkspaces: Set(niriRemovalSeeds.keys),
                     useScrollAnimationPath: true,
                     removalSeeds: niriRemovalSeeds
-                ))
-            }
-            if !dwindleWorkspaces.isEmpty {
-                plans.append(
-                    contentsOf: self.dwindleHandler.layoutWithDwindleEngine(activeWorkspaces: dwindleWorkspaces)
                 )
-            }
-            return plans
         }
 
         let activeWorkspaceIds = currentActiveWorkspaceIds()
@@ -2035,24 +1945,13 @@ import QuartzCore
             Set<WorkspaceDescriptor.ID>()
         }
         let layoutWorkspaceIds = scanLayoutWorkspaceIds.union(explicitRelayoutWorkspaceIds)
-        let (niriWorkspaces, dwindleWorkspaces) = partitionWorkspacesByLayoutType(layoutWorkspaceIds)
 
         let workspacePlans = buildWorkspacePlansInBatch {
-            var plans: [WorkspaceLayoutPlan] = []
-            plans.reserveCapacity(niriWorkspaces.count + dwindleWorkspaces.count)
-            if !niriWorkspaces.isEmpty {
-                plans.append(contentsOf: self.niriHandler.layoutWithNiriEngine(
-                    activeWorkspaces: niriWorkspaces,
-                    useScrollAnimationPath: false,
-                    removalSeeds: niriRemovalSeeds
-                ))
-            }
-            if !dwindleWorkspaces.isEmpty {
-                plans.append(
-                    contentsOf: self.dwindleHandler.layoutWithDwindleEngine(activeWorkspaces: dwindleWorkspaces)
-                )
-            }
-            return plans
+            self.niriHandler.layoutWithNiriEngine(
+                activeWorkspaces: layoutWorkspaceIds,
+                useScrollAnimationPath: false,
+                removalSeeds: niriRemovalSeeds
+            )
         }
 
         var effects = EffectPlanEffects()
@@ -2099,31 +1998,6 @@ import QuartzCore
         )
     }
 
-
-    private func partitionWorkspacesByLayoutType(
-        _ workspaces: Set<WorkspaceDescriptor.ID>
-    ) -> (niri: Set<WorkspaceDescriptor.ID>, dwindle: Set<WorkspaceDescriptor.ID>) {
-        guard let controller else { return ([], []) }
-
-        var niriWorkspaces: Set<WorkspaceDescriptor.ID> = []
-        var dwindleWorkspaces: Set<WorkspaceDescriptor.ID> = []
-
-        for wsId in workspaces {
-            guard let ws = controller.workspaceManager.descriptor(for: wsId) else {
-                continue
-            }
-            let layoutType = controller.settings.layoutType(for: ws.name)
-            switch layoutType {
-            case .dwindle:
-                dwindleWorkspaces.insert(wsId)
-            case .niri,
-                 .defaultLayout:
-                niriWorkspaces.insert(wsId)
-            }
-        }
-
-        return (niriWorkspaces, dwindleWorkspaces)
-    }
 
     private func liveLayoutWorkspaceIds(
         _ workspaceIds: Set<WorkspaceDescriptor.ID>,

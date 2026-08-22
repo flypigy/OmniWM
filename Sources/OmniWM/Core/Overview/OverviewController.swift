@@ -51,27 +51,6 @@ struct OverviewEnvironment {
     var onCachedProjectionRefreshed: (Set<WorkspaceDescriptor.ID>) -> Void = { _ in }
 }
 
-struct DwindleOverviewWorkspaceProjection {
-    let inactiveTokens: Set<WindowToken>
-    let frames: [WindowToken: CGRect]
-    let groupCountByToken: [WindowToken: Int]
-
-    init(engine: DwindleLayoutEngine, workspaceId: WorkspaceDescriptor.ID) {
-        inactiveTokens = engine.inactiveGroupTokens(in: workspaceId)
-        frames = engine.currentFrames(in: workspaceId)
-
-        var groupCounts: [WindowToken: Int] = [:]
-        for snapshot in engine.groupedTileSnapshots(in: workspaceId) {
-            groupCounts[snapshot.activeToken] = snapshot.members.count
-        }
-        groupCountByToken = groupCounts
-    }
-
-    func includes(_ token: WindowToken) -> Bool {
-        !inactiveTokens.contains(token)
-    }
-}
-
 @MainActor
 final class OverviewController {
     private enum ScrollTuning {
@@ -300,11 +279,9 @@ final class OverviewController {
             return .unchanged
         }
         let workspaceId = entry.workspaceId
-        let isNiri = wmController.workspaceManager.activeLayoutKind(for: workspaceId) == .niri
 
         switch command {
         case let .move(direction):
-            guard isNiri else { return .unchanged }
             let outcome = wmController.niriLayoutHandler.moveWindow(
                 handle: selectedHandle,
                 direction: direction
@@ -324,49 +301,39 @@ final class OverviewController {
                 direction: direction
             )
         case .moveWindowDown:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveWindowWithinContainer(
                 handle: selectedHandle,
                 direction: .down
             )
         case .moveWindowUp:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveWindowWithinContainer(
                 handle: selectedHandle,
                 direction: .up
             )
         case .moveWindowDownOrToWorkspaceDown:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveWindowOrToAdjacentWorkspace(
                 handle: selectedHandle,
                 direction: .down
             )
         case .moveWindowUpOrToWorkspaceUp:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveWindowOrToAdjacentWorkspace(
                 handle: selectedHandle,
                 direction: .up
             )
         case .consumeWindowIntoColumn:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.consumeWindowIntoColumn(containing: selectedHandle)
         case .expelWindowFromColumn:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.expelWindowFromColumn(containing: selectedHandle)
         case let .moveColumn(direction):
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveColumn(
                 containing: selectedHandle,
                 direction: direction
             )
         case .moveColumnToFirst:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveColumnToFirst(containing: selectedHandle)
         case .moveColumnToLast:
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveColumnToLast(containing: selectedHandle)
         case let .moveColumnToIndex(index):
-            guard isNiri else { return .unchanged }
             return wmController.niriLayoutHandler.moveColumn(
                 containing: selectedHandle,
                 toOneBasedIndex: index
@@ -387,19 +354,16 @@ final class OverviewController {
                 direction: .down
             )
         case let .moveColumnToWorkspace(index):
-            guard isNiri else { return .unchanged }
             return wmController.workspaceNavigationHandler.moveColumn(
                 containing: selectedHandle,
                 toWorkspaceIndex: index
             )
         case .moveColumnToWorkspaceUp:
-            guard isNiri else { return .unchanged }
             return wmController.workspaceNavigationHandler.moveColumnToAdjacentWorkspace(
                 containing: selectedHandle,
                 direction: .up
             )
         case .moveColumnToWorkspaceDown:
-            guard isNiri else { return .unchanged }
             return wmController.workspaceNavigationHandler.moveColumnToAdjacentWorkspace(
                 containing: selectedHandle,
                 direction: .down
@@ -444,7 +408,7 @@ final class OverviewController {
 
     private func completeStructuralMutation(_ mutation: StructuralMutation) {
         guard let wmController, activateStructuralDestination(mutation) else { return }
-        let transferGeneration = serializesTransfer(mutation) ? beginStructuralTransfer() : nil
+        let transferGeneration: UInt64? = nil
         let projectionGeneration = beginProjectionMutation(
             affectedWorkspaceIds: projectionWorkspaceIds(for: mutation)
         )
@@ -542,24 +506,6 @@ final class OverviewController {
             in: mutation.destinationWorkspaceId,
             onMonitor: monitor.id
         )
-        if wmController.workspaceManager.activeLayoutKind(for: mutation.destinationWorkspaceId) == .dwindle,
-           let engine = wmController.dwindleEngine,
-           let node = engine.findNode(for: mutation.selectedHandle.id, in: mutation.destinationWorkspaceId)
-        {
-            wmController.workspaceManager.withEngineMutationScope(in: mutation.destinationWorkspaceId) {
-                engine.setSelectedNode(node, in: mutation.destinationWorkspaceId)
-            }
-        }
-    }
-
-    private func serializesTransfer(_ mutation: StructuralMutation) -> Bool {
-        guard mutation.sourceWorkspaceId != mutation.destinationWorkspaceId,
-              let wmController
-        else {
-            return false
-        }
-        return wmController.workspaceManager.activeLayoutKind(for: mutation.sourceWorkspaceId)
-            != wmController.workspaceManager.activeLayoutKind(for: mutation.destinationWorkspaceId)
     }
 
     private func beginStructuralTransfer() -> UInt64? {
@@ -719,12 +665,9 @@ final class OverviewController {
                     isActive: ws.id == activeWs?.id
                 ))
 
-                let dwindleProjection = dwindleOverviewProjection(for: ws.id)
-
                 for entry in workspaceManager.entries(in: ws.id) {
                     guard entry.layoutReason == .standard,
                           !workspaceManager.isAppHidden(pid: entry.pid),
-                          dwindleProjection?.includes(entry.token) != false,
                           let handle = workspaceManager.handle(for: entry.token)
                     else {
                         continue
@@ -732,12 +675,9 @@ final class OverviewController {
 
                     windowData[handle] = makeOverviewWindowData(
                         for: entry,
-                        preferredFrame: dwindleProjection?.frames[entry.token],
+                        preferredFrame: nil,
                         appInfoCache: wmController.appInfoCache
                     )
-                    if let count = dwindleProjection?.groupCountByToken[entry.token], count > 1 {
-                        groupCountByHandle[handle] = count
-                    }
                 }
             }
         }
@@ -782,30 +722,16 @@ final class OverviewController {
 
         var engineFrames: [WindowToken: CGRect] = [:]
         var niriWorkspaceIds: Set<WorkspaceDescriptor.ID> = []
-        var dwindleProjections: [WorkspaceDescriptor.ID: DwindleOverviewWorkspaceProjection] = [:]
         for workspaceId in affectedWorkspaceIds {
-            switch workspaceManager.activeLayoutKind(for: workspaceId) {
-            case .niri:
-                niriWorkspaceIds.insert(workspaceId)
-                if let frames = wmController.niriEngine?.captureWindowFrames(in: workspaceId) {
-                    engineFrames.merge(frames) { _, new in new }
-                }
-                if let snapshot = wmController.niriEngine?.overviewSnapshot(for: workspaceId),
-                   let filteredSnapshot = cachedNiriSnapshot(snapshot)
-                {
-                    overviewSnapshot.niriSnapshotsByWorkspace[workspaceId] = filteredSnapshot
-                } else {
-                    overviewSnapshot.niriSnapshotsByWorkspace.removeValue(forKey: workspaceId)
-                }
-            case .dwindle:
-                if let engine = wmController.dwindleEngine {
-                    let projection = DwindleOverviewWorkspaceProjection(
-                        engine: engine,
-                        workspaceId: workspaceId
-                    )
-                    dwindleProjections[workspaceId] = projection
-                    engineFrames.merge(projection.frames) { _, new in new }
-                }
+            niriWorkspaceIds.insert(workspaceId)
+            if let frames = wmController.niriEngine?.captureWindowFrames(in: workspaceId) {
+                engineFrames.merge(frames) { _, new in new }
+            }
+            if let snapshot = wmController.niriEngine?.overviewSnapshot(for: workspaceId),
+               let filteredSnapshot = cachedNiriSnapshot(snapshot)
+            {
+                overviewSnapshot.niriSnapshotsByWorkspace[workspaceId] = filteredSnapshot
+            } else {
                 overviewSnapshot.niriSnapshotsByWorkspace.removeValue(forKey: workspaceId)
             }
         }
@@ -840,13 +766,6 @@ final class OverviewController {
             )
         }
 
-        for (workspaceId, projection) in dwindleProjections {
-            reconcileDwindleOverviewProjection(
-                projection,
-                workspaceId: workspaceId
-            )
-        }
-
         overviewSnapshot.groupCountByHandle = overviewSnapshot.groupCountByHandle.filter {
             overviewSnapshot.windows[$0.key] != nil
         }
@@ -865,73 +784,6 @@ final class OverviewController {
         if !uncachedAddedWindowIds.isEmpty {
             let uncachedWindowIds = Set(overviewSnapshot.windowIds.filter { thumbnailCache[$0] == nil })
             startThumbnailCapture(windowIds: uncachedWindowIds)
-        }
-    }
-
-    private func dwindleOverviewProjection(
-        for workspaceId: WorkspaceDescriptor.ID
-    ) -> DwindleOverviewWorkspaceProjection? {
-        guard let wmController,
-              wmController.workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
-              let engine = wmController.dwindleEngine
-        else {
-            return nil
-        }
-        return DwindleOverviewWorkspaceProjection(engine: engine, workspaceId: workspaceId)
-    }
-
-    private func reconcileDwindleOverviewProjection(
-        _ projection: DwindleOverviewWorkspaceProjection,
-        workspaceId: WorkspaceDescriptor.ID
-    ) {
-        guard let wmController else { return }
-        let workspaceManager = wmController.workspaceManager
-        var desiredHandles: Set<WindowHandle> = []
-
-        for entry in workspaceManager.entries(in: workspaceId) {
-            guard entry.layoutReason == .standard,
-                  !workspaceManager.isAppHidden(pid: entry.pid),
-                  projection.includes(entry.token),
-                  let handle = workspaceManager.handle(for: entry.token)
-            else {
-                continue
-            }
-
-            desiredHandles.insert(handle)
-            let frame = projection.frames[entry.token]
-                ?? overviewSnapshot.windows[handle]?.frame
-                ?? environment.windowFrame(entry)
-                ?? .zero
-            if let data = overviewSnapshot.windows[handle] {
-                if data.token != entry.token || data.workspaceId != workspaceId || data.frame != frame {
-                    overviewSnapshot.windows[handle] = (
-                        token: entry.token,
-                        workspaceId: workspaceId,
-                        title: data.title,
-                        appName: data.appName,
-                        appIcon: data.appIcon,
-                        frame: frame
-                    )
-                }
-            } else {
-                overviewSnapshot.windows[handle] = makeOverviewWindowData(
-                    for: entry,
-                    preferredFrame: frame,
-                    appInfoCache: wmController.appInfoCache
-                )
-            }
-
-            if let count = projection.groupCountByToken[entry.token], count > 1 {
-                overviewSnapshot.groupCountByHandle[handle] = count
-            }
-        }
-
-        let staleHandles = overviewSnapshot.windows.compactMap { handle, data in
-            data.workspaceId == workspaceId && !desiredHandles.contains(handle) ? handle : nil
-        }
-        for handle in staleHandles {
-            overviewSnapshot.windows.removeValue(forKey: handle)
-            overviewSnapshot.groupCountByHandle.removeValue(forKey: handle)
         }
     }
 
@@ -2235,9 +2087,7 @@ private extension OverviewController {
 
     func isNiriLayout(workspaceId: WorkspaceDescriptor.ID) -> Bool {
         guard let wmController else { return false }
-        guard let name = wmController.workspaceManager.descriptor(for: workspaceId)?.name else { return false }
-        let layoutType = wmController.settings.layoutType(for: name)
-        return layoutType != .dwindle
+        return wmController.workspaceManager.descriptor(for: workspaceId) != nil
     }
 
     func overviewInsertPositionToNiri(_ position: InsertPosition) -> InsertPosition {

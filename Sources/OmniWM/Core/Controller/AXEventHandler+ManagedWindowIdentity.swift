@@ -508,8 +508,6 @@ extension AXEventHandler {
         managedReplacementMetadata: ManagedReplacementMetadata?
     ) -> WindowState? {
         guard let controller else { return nil }
-        let focusTransactionIds = controller.dwindleLayoutHandler
-            .currentPendingGroupRevealFocusTransactionIds(for: oldToken)
         return controller.withRuntimeFrameJobCancellationSuppressed {
             guard let entry = controller.workspaceManager.rekeyWindow(
                 from: oldToken,
@@ -530,12 +528,6 @@ extension AXEventHandler {
             controller.layoutRefreshController.rekeyNativeFullscreenRestoredFrameApply(
                 from: oldToken,
                 to: newToken
-            )
-            controller.dwindleLayoutHandler.rekeyPendingGroupRevealTransaction(
-                from: oldToken,
-                to: newToken,
-                entry: entry,
-                rebasingFocusTransactionIds: focusTransactionIds
             )
             return entry
         }

@@ -73,56 +73,6 @@ final class WorkspaceMoveFocusBehaviorTests: XCTestCase {
         }
     }
 
-    func testDwindleAdjacentWindowMoveHonorsFollowSetting() throws {
-        for followsFocus in [false, true] {
-            let fixture = try makeFixture(layouts: [.dwindle], followsFocus: followsFocus)
-            let sourceWorkspaceId = fixture.workspaceIds[0]
-            let fallback = try addManagedWindow(
-                pid: 488_002,
-                windowId: followsFocus ? 12 : 11,
-                to: sourceWorkspaceId,
-                fixture: fixture
-            )
-            let moved = try addManagedWindow(
-                pid: 488_002,
-                windowId: followsFocus ? 14 : 13,
-                to: sourceWorkspaceId,
-                fixture: fixture
-            )
-            try select(moved, in: sourceWorkspaceId, fixture: fixture)
-
-            try withBlockedLayoutRefreshes(fixture) {
-                fixture.controller.workspaceNavigationHandler.moveWindowToAdjacentWorkspace(direction: .down)
-
-                let destinationWorkspaceId = try XCTUnwrap(
-                    fixture.controller.workspaceManager.workspaceId(named: "2")
-                )
-                XCTAssertEqual(
-                    fixture.controller.workspaceManager.workspace(for: fallback.id),
-                    sourceWorkspaceId
-                )
-                XCTAssertEqual(
-                    fixture.controller.workspaceManager.workspace(for: moved.id),
-                    destinationWorkspaceId
-                )
-                XCTAssertEqual(
-                    fixture.controller.workspaceManager.lastFocusedToken(in: sourceWorkspaceId),
-                    fallback.id
-                )
-                XCTAssertEqual(
-                    fixture.controller.workspaceManager.lastFocusedToken(in: destinationWorkspaceId),
-                    moved.id
-                )
-
-                try assertCompletion(
-                    fixture,
-                    activeWorkspaceId: followsFocus ? destinationWorkspaceId : sourceWorkspaceId,
-                    expectedFocusToken: followsFocus ? moved.id : fallback.id
-                )
-            }
-        }
-    }
-
     func testNiriAdjacentWindowMoveUpHonorsFollowSetting() throws {
         for followsFocus in [false, true] {
             let fixture = try makeFixture(layouts: [.niri, .niri], followsFocus: followsFocus)
@@ -420,10 +370,9 @@ final class WorkspaceMoveFocusBehaviorTests: XCTestCase {
     }
 
     func testDirectMonitorMoveTargetsActiveWorkspaceAndHonorsFollowSetting() throws {
-        for layout in [LayoutType.niri, .dwindle] {
-            for followsFocus in [false, true] {
-                let fixture = try makeMonitorMoveFixture(layout: layout, followsFocus: followsFocus)
-                let idOffset = (layout == .niri ? 0 : 100) + (followsFocus ? 10 : 0)
+        for followsFocus in [false, true] {
+            let fixture = try makeMonitorMoveFixture(layout: .niri, followsFocus: followsFocus)
+            let idOffset = followsFocus ? 10 : 0
                 let fallback = try addManagedWindow(
                     pid: pid_t(488_100 + idOffset),
                     windowId: 1,
@@ -499,7 +448,6 @@ final class WorkspaceMoveFocusBehaviorTests: XCTestCase {
                         expectedFocusToken
                     )
                 }
-            }
         }
     }
 
@@ -747,10 +695,6 @@ extension WorkspaceMoveFocusBehaviorTests {
         niriEngine.animationClock = controller.animationClock
         controller.niriEngine = niriEngine
         controller.niriLayoutHandler.syncMonitorsToNiriEngine()
-
-        let dwindleEngine = DwindleLayoutEngine()
-        dwindleEngine.animationClock = controller.animationClock
-        controller.dwindleEngine = dwindleEngine
     }
 
     private func addManagedWindow(
@@ -780,16 +724,7 @@ extension WorkspaceMoveFocusBehaviorTests {
             to: workspaceId
         )
         controller.workspaceManager.withEngineMutationScope(in: workspaceId) {
-            switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
-            case .niri:
-                _ = controller.niriEngine?.addWindow(token: token, to: workspaceId, afterSelection: nil)
-            case .dwindle:
-                _ = controller.dwindleEngine?.addWindow(
-                    token: token,
-                    to: workspaceId,
-                    activeWindowFrame: nil
-                )
-            }
+            _ = controller.niriEngine?.addWindow(token: token, to: workspaceId, afterSelection: nil)
         }
         return try XCTUnwrap(controller.workspaceManager.handle(for: token))
     }
@@ -815,31 +750,17 @@ extension WorkspaceMoveFocusBehaviorTests {
         controller: WMController,
         focusRecorder: FocusRecorder
     ) throws {
-        switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
-        case .niri:
-            let engine = try XCTUnwrap(controller.niriEngine)
-            let node = try XCTUnwrap(engine.findNode(for: handle, in: workspaceId))
-            controller.workspaceManager.withEngineMutationScope(in: workspaceId) {
-                engine.activateWindow(node.id, in: workspaceId)
-            }
-            _ = controller.workspaceManager.commitWorkspaceSelection(
-                nodeId: node.id,
-                focusedToken: handle.id,
-                in: workspaceId,
-                onMonitor: monitor.id
-            )
-        case .dwindle:
-            let engine = try XCTUnwrap(controller.dwindleEngine)
-            controller.workspaceManager.withEngineMutationScope(in: workspaceId) {
-                _ = engine.activateWindow(handle.id, in: workspaceId)
-            }
-            _ = controller.workspaceManager.commitWorkspaceSelection(
-                nodeId: nil,
-                focusedToken: handle.id,
-                in: workspaceId,
-                onMonitor: monitor.id
-            )
+        let engine = try XCTUnwrap(controller.niriEngine)
+        let node = try XCTUnwrap(engine.findNode(for: handle, in: workspaceId))
+        controller.workspaceManager.withEngineMutationScope(in: workspaceId) {
+            engine.activateWindow(node.id, in: workspaceId)
         }
+        _ = controller.workspaceManager.commitWorkspaceSelection(
+            nodeId: node.id,
+            focusedToken: handle.id,
+            in: workspaceId,
+            onMonitor: monitor.id
+        )
         _ = controller.workspaceManager.setManagedFocus(
             handle.id,
             in: workspaceId,

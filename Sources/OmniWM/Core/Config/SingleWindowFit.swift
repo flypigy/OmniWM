@@ -41,7 +41,6 @@ struct SingleWindowFit: Equatable {
     static let defaultHeight: Double = 1080
     static let fullScreen = SingleWindowFit(mode: .fill)
 
-    static let dwindleModes: [Mode] = [.fill, .custom]
     static let niriModes: [Mode] = [.fill, .custom, .containerPrimarySpan]
 
     var hasValidCustomSize: Bool {

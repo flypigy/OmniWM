@@ -684,23 +684,12 @@ final class WindowActionHandler {
         guard token != anchorToken else { return false }
 
         let targetWorkspaceId = anchorWorkspaceId
-        switch layoutType(for: targetWorkspaceId) {
-        case .dwindle:
-            return summonWindowRightInDwindle(
-                token: token,
-                sourceWorkspaceId: targetEntry.workspaceId,
-                targetWorkspaceId: targetWorkspaceId,
-                focusedToken: anchorToken
-            )
-        case .niri,
-             .defaultLayout:
-            return summonWindowRightInNiri(
-                token: token,
-                sourceWorkspaceId: targetEntry.workspaceId,
-                targetWorkspaceId: targetWorkspaceId,
-                focusedToken: anchorToken
-            )
-        }
+        return summonWindowRightInNiri(
+            token: token,
+            sourceWorkspaceId: targetEntry.workspaceId,
+            targetWorkspaceId: targetWorkspaceId,
+            focusedToken: anchorToken
+        )
     }
 
     @discardableResult
@@ -713,8 +702,7 @@ final class WindowActionHandler {
         else {
             return false
         }
-        let targetLayoutKind = controller.workspaceManager.activeLayoutKind(for: workspaceId)
-        if targetLayoutKind == .niri, controller.niriEngine == nil {
+        guard controller.niriEngine != nil else {
             return false
         }
 
@@ -728,63 +716,49 @@ final class WindowActionHandler {
             }
         }
 
-        switch targetLayoutKind {
-        case .dwindle:
-            if !prepareDwindleNavigationTarget(token, workspaceId: workspaceId) {
-                _ = controller.workspaceManager.applySessionPatch(
-                    .init(
-                        workspaceId: workspaceId,
-                        viewportState: nil,
-                        rememberedFocusToken: token,
-                        plannedSeq: controller.workspaceManager.worldSeq
-                    )
-                )
-            }
-        case .niri:
-            guard let engine = controller.niriEngine else { return false }
-            var targetState = controller.workspaceManager.niriViewportState(for: workspaceId)
-            if let niriWindow = engine.findNode(for: token, in: workspaceId) {
-                targetState.selectedNodeId = niriWindow.id
+        guard let engine = controller.niriEngine else { return false }
+        var targetState = controller.workspaceManager.niriViewportState(for: workspaceId)
+        if let niriWindow = engine.findNode(for: token, in: workspaceId) {
+            targetState.selectedNodeId = niriWindow.id
 
-                if engine.findColumn(containing: niriWindow, in: workspaceId) != nil,
-                   let monitor = controller.workspaceManager.monitor(for: workspaceId)
-                {
-                    let gap = controller.innerGap(for: monitor)
-                    let workingFrame = controller.insetWorkingFrame(for: monitor)
-                    let orientation = controller.settings.effectiveOrientation(for: monitor)
-                    controller.workspaceManager.withEngineMutationScope {
-                        engine.activateWindow(niriWindow.id, in: workspaceId)
-                        engine.resolvePrimaryContainerSpans(
-                            in: workspaceId,
-                            workingFrame: workingFrame,
-                            gaps: gap,
-                            orientation: orientation
-                        )
-                        engine.ensureProjectedSelectionVisible(
-                            node: niriWindow,
-                            in: workspaceId,
-                            motion: .disabled,
-                            state: &targetState,
-                            workingFrame: workingFrame,
-                            gaps: gap,
-                            orientation: orientation,
-                            animationConfig: nil,
-                            fromContainerIndex: nil
-                        )
-                        targetState.selectionProgress = 0
-                    }
+            if engine.findColumn(containing: niriWindow, in: workspaceId) != nil,
+               let monitor = controller.workspaceManager.monitor(for: workspaceId)
+            {
+                let gap = controller.innerGap(for: monitor)
+                let workingFrame = controller.insetWorkingFrame(for: monitor)
+                let orientation = controller.settings.effectiveOrientation(for: monitor)
+                controller.workspaceManager.withEngineMutationScope {
+                    engine.activateWindow(niriWindow.id, in: workspaceId)
+                    engine.resolvePrimaryContainerSpans(
+                        in: workspaceId,
+                        workingFrame: workingFrame,
+                        gaps: gap,
+                        orientation: orientation
+                    )
+                    engine.ensureProjectedSelectionVisible(
+                        node: niriWindow,
+                        in: workspaceId,
+                        motion: .disabled,
+                        state: &targetState,
+                        workingFrame: workingFrame,
+                        gaps: gap,
+                        orientation: orientation,
+                        animationConfig: nil,
+                        fromContainerIndex: nil
+                    )
+                    targetState.selectionProgress = 0
                 }
             }
-
-            _ = controller.workspaceManager.applySessionPatch(
-                .init(
-                    workspaceId: workspaceId,
-                    viewportState: targetState,
-                    rememberedFocusToken: token,
-                    plannedSeq: controller.workspaceManager.worldSeq
-                )
-            )
         }
+
+        _ = controller.workspaceManager.applySessionPatch(
+            .init(
+                workspaceId: workspaceId,
+                viewportState: targetState,
+                rememberedFocusToken: token,
+                plannedSeq: controller.workspaceManager.worldSeq
+            )
+        )
         let newestFocusIntentId = controller.intentLedger.newestFocusIntentId()
         let focusTarget: LayoutRefreshController.PostLayoutAction = { [weak controller] in
             guard let controller,
@@ -831,7 +805,6 @@ final class WindowActionHandler {
         }
 
         let insertIndex = focusedColumnIndex + 1
-        let sourceLayoutType = layoutType(for: sourceWorkspaceId)
 
         if sourceWorkspaceId == targetWorkspaceId {
             guard controller.niriLayoutHandler.insertWindowInNewColumn(
@@ -852,16 +825,6 @@ final class WindowActionHandler {
             return false
         }
 
-        if sourceLayoutType == .dwindle {
-            commitSummonedWindowFocus(
-                token: token,
-                workspaceId: targetWorkspaceId,
-                rememberedFocusToken: focusedToken,
-                startNiriScrollAnimation: true
-            )
-            return true
-        }
-
         guard controller.niriLayoutHandler.insertWindowInNewColumn(
             handle: handle,
             insertIndex: insertIndex,
@@ -871,53 +834,6 @@ final class WindowActionHandler {
             return false
         }
         commitSummonedWindowFocus(token: token, workspaceId: targetWorkspaceId, startNiriScrollAnimation: true)
-        return true
-    }
-
-    @discardableResult
-    private func summonWindowRightInDwindle(
-        token: WindowToken,
-        sourceWorkspaceId: WorkspaceDescriptor.ID,
-        targetWorkspaceId: WorkspaceDescriptor.ID,
-        focusedToken: WindowToken
-    ) -> Bool {
-        guard let controller,
-              let engine = controller.dwindleEngine,
-              let focusedNode = engine.findNode(for: focusedToken, in: targetWorkspaceId),
-              focusedNode.isLeaf
-        else {
-            return false
-        }
-
-        if sourceWorkspaceId == targetWorkspaceId {
-            guard controller.workspaceManager.withEngineMutationScope(label: "summon_window", {
-                engine.summonWindowRight(token, beside: focusedToken, in: targetWorkspaceId)
-            }) else {
-                return false
-            }
-            controller.workspaceManager.recordLayoutOperation(.windowInserted(token: token), in: targetWorkspaceId)
-            commitSummonedWindowFocus(token: token, workspaceId: targetWorkspaceId)
-            return true
-        }
-
-        _ = controller.dwindleLayoutHandler.activateWindow(
-            focusedToken,
-            in: targetWorkspaceId,
-            layoutRefresh: false,
-            focusAfterLayout: false
-        )
-        controller.workspaceManager.withEngineMutationScope {
-            engine.setPreselection(.right, in: targetWorkspaceId)
-        }
-
-        guard controller.workspaceNavigationHandler.moveWindow(
-            handle: WindowHandle(id: token),
-            toWorkspaceId: targetWorkspaceId
-        ).didMutate else {
-            return false
-        }
-
-        commitSummonedWindowFocus(token: token, workspaceId: targetWorkspaceId)
         return true
     }
 
@@ -947,38 +863,6 @@ final class WindowActionHandler {
         }
     }
 
-    private func layoutType(for workspaceId: WorkspaceDescriptor.ID) -> LayoutType {
-        guard let controller,
-              let workspaceName = controller.workspaceManager.descriptor(for: workspaceId)?.name
-        else {
-            return .defaultLayout
-        }
-        return controller.settings.layoutType(for: workspaceName)
-    }
-
-    private func prepareDwindleNavigationTarget(
-        _ token: WindowToken,
-        workspaceId: WorkspaceDescriptor.ID
-    ) -> Bool {
-        guard let controller,
-              controller.workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
-              let entry = controller.workspaceManager.entry(for: token),
-              entry.workspaceId == workspaceId,
-              entry.mode == .tiling,
-              entry.layoutReason == .standard,
-              controller.dwindleEngine?.findNode(for: token, in: workspaceId) != nil
-        else {
-            return false
-        }
-
-        return controller.dwindleLayoutHandler.activateWindow(
-            token,
-            in: workspaceId,
-            layoutRefresh: false,
-            focusAfterLayout: false
-        ) != .missing
-    }
-
     @discardableResult
     func focusWorkspaceFromBar(named name: String) -> Bool {
         guard let controller else { return false }
@@ -1006,9 +890,6 @@ final class WindowActionHandler {
     ) -> Bool {
         guard let controller else { return false }
         let focusedToken = controller.resolveAndSetWorkspaceFocusToken(for: result.workspace.id)
-        if let focusedToken {
-            _ = prepareDwindleNavigationTarget(focusedToken, workspaceId: result.workspace.id)
-        }
         controller.layoutRefreshController
             .commitWorkspaceTransition(reason: .workspaceTransition) { [weak controller] in
                 if let focusedToken {

@@ -544,20 +544,6 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: 100.01)
     }
 
-    func testDwindleWorkspaceGestureDoesNotClaimViewportWhileArmed() throws {
-        let fixture = try makeFixture(scrollGestureEnabled: true, enableNiri: false)
-        fixture.controller.settings.workspaceConfigurations = fixture.controller.settings.workspaceConfigurations.map {
-            $0.with(layoutType: .dwindle)
-        }
-        fixture.controller.enableDwindleLayout()
-        sendFrame(fixture, phase: .began, fingers: 3, x: 0.5, y: 0.2, at: 100)
-
-        XCTAssertTrue(fixture.controller.mouseEventHandler.isTrackpadSwipeSessionActive)
-        XCTAssertFalse(fixture.controller.mouseEventHandler.isViewportGestureActive)
-
-        sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: 100.01)
-    }
-
     func testDistinctWorkspaceFingerCountDoesNotClaimViewportWhileArmed() throws {
         let fixture = try makeFixture(
             workspaceFingers: .four,
@@ -707,19 +693,6 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         XCTAssertEqual(manager.activeWorkspaceOrFirst(on: monitorB.id)?.id, wsB2)
         XCTAssertEqual(activeWorkspace(fixture), fixture.ws1)
         XCTAssertEqual(manager.interactionMonitorId, monitorB.id)
-    }
-
-    func testDwindleWorkspaceSwipeSwitchesWorkspaces() throws {
-        let fixture = try makeFixture(enableNiri: false)
-        fixture.controller.settings.workspaceConfigurations = fixture.controller.settings.workspaceConfigurations.map {
-            $0.with(layoutType: .dwindle)
-        }
-        fixture.controller.enableDwindleLayout()
-
-        _ = performVerticalSwipe(fixture, totalUnits: 220, startTime: 100)
-
-        XCTAssertEqual(activeWorkspace(fixture), fixture.ws2)
-        XCTAssertEqual(fixture.controller.workspaceManager.activeLayoutKind(for: fixture.ws2), .dwindle)
     }
 
     func testSingleWorkspaceCursorMonitorSwipeDoesNotMutateInteraction() throws {

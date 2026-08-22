@@ -61,8 +61,6 @@ final class WorldStore {
     private(set) var monitorSessions: [Monitor.ID: MonitorSession] = [:]
     private(set) var spaceTopology = SpaceTopology()
     private(set) var niriEngine: NiriLayoutEngine?
-    private(set) var dwindleEngine: DwindleLayoutEngine?
-    private var activeLayoutResolver: ((WorkspaceDescriptor.ID) -> ActiveLayoutKind)?
     private(set) var epochMarks = InvalidationMarks()
     private var broadcastMarks = InvalidationMarks()
     private var workspaceMarks: [WorkspaceDescriptor.ID: InvalidationMarks] = [:]
@@ -76,7 +74,6 @@ final class WorldStore {
     private func pushEngineSanction() {
         let sanctioned = isEngineMutationSanctioned
         niriEngine?.isMutationSanctioned = sanctioned
-        dwindleEngine?.isMutationSanctioned = sanctioned
     }
 
     init(nowProvider: @escaping () -> Date = Date.init) {
@@ -261,7 +258,6 @@ final class WorldStore {
                 managedReplacementMetadata: metadata
             )
             _ = niriEngine?.rekeyWindow(from: from, to: to, in: workspaceId)
-            _ = dwindleEngine?.rekeyWindow(from: from, to: to, in: workspaceId)
             refreshProjectionExclusions(in: [workspaceId])
 
         case let .windowRemoved(token, _, _):
@@ -391,16 +387,10 @@ final class WorldStore {
     ) {
         for workspaceId in workspaceIds {
             let tiledEntries = model.windows(in: workspaceId).filter { $0.mode == .tiling }
-            let authoritativeTokens = Set(tiledEntries.lazy.map(\.token))
             let excludedTokens = Set(tiledEntries.lazy.filter {
                 self.hiddenAppPIDs.contains($0.pid)
             }.map(\.token))
             niriEngine?.setProjectionExclusions(excludedTokens, in: workspaceId)
-            dwindleEngine?.setExcludedTokens(
-                excludedTokens,
-                authoritativeTokens: authoritativeTokens,
-                in: workspaceId
-            )
         }
     }
 
@@ -886,17 +876,7 @@ extension WorldStore {
     }
 
     func layoutTopology(for workspaceId: WorkspaceDescriptor.ID) -> LayoutTopology {
-        switch activeLayoutResolver?(workspaceId) {
-        case .dwindle:
-            return LayoutTopology(dwindleFullscreenTokens: dwindleEngine?.fullscreenTokens(in: workspaceId) ?? [])
-        case .niri,
-             nil:
-            return LayoutTopology(columns: niriEngine?.topologyColumns(in: workspaceId) ?? [])
-        }
-    }
-
-    func installActiveLayoutResolver(_ resolver: ((WorkspaceDescriptor.ID) -> ActiveLayoutKind)?) {
-        activeLayoutResolver = resolver
+        LayoutTopology(columns: niriEngine?.topologyColumns(in: workspaceId) ?? [])
     }
 
     @discardableResult
@@ -941,11 +921,6 @@ extension WorldStore {
             }
         }
         return captured
-    }
-
-    func installDwindleEngine(_ engine: DwindleLayoutEngine?) {
-        engine?.isMutationSanctioned = isEngineMutationSanctioned
-        dwindleEngine = engine
     }
 
     func applyViewportPlan(_ viewportPlan: ViewportPlan) {

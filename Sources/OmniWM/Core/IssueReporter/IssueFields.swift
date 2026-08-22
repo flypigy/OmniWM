@@ -20,7 +20,7 @@ enum IssueCategory: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .unspecified: "Unspecified"
-        case .layout: "Tiling layout (Niri / Dwindle)"
+        case .layout: "Tiling layout (Niri)"
         case .focus: "Focus / focus-follows-mouse"
         case .multiMonitor: "Multi-monitor / workspaces"
         case .placement: "Window placement or sizing"
@@ -55,7 +55,7 @@ extension LayoutType {
     }
 
     static var reportChoices: [LayoutType] {
-        [.niri, .dwindle]
+        [.niri]
     }
 }
 

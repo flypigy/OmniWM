@@ -51,12 +51,10 @@ extension AXEventHandler {
         }
         let entries = controller.workspaceManager.entries(forPid: pid)
         let affectedWorkspaceIds = Set(entries.map(\.workspaceId))
-        controller.dwindleLayoutHandler.cancelPendingGroupReveals(pid: pid)
         controller.mouseEventHandler.handleAppVisibilityChanged()
         for workspaceId in affectedWorkspaceIds {
             controller.layoutRefreshController.cancelActiveAnimations(for: workspaceId)
         }
-        controller.layoutRefreshController.stopAllDwindleAnimations()
         controller.layoutRefreshController.cancelFrameAnimations(forPID: pid)
         controller.axManager.setMacOSAppHidden(
             true,

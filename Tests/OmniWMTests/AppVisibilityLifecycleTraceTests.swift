@@ -185,10 +185,6 @@ final class AppVisibilityLifecycleTraceTests: XCTestCase {
 
     private func makeFixture(pid: pid_t, windowId: Int, withMonitor: Bool) throws -> Fixture {
         let controller = WindowAdmissionTestSupport.controller(prefix: "AppVisibilityLifecycleTraceTests")
-        controller.settings.workspaceConfigurations = controller.settings.workspaceConfigurations.map {
-            $0.name == "1" ? $0.with(layoutType: .dwindle) : $0
-        }
-        controller.workspaceManager.applySettings()
         if withMonitor {
             let monitor = Monitor(
                 id: .init(displayId: 92_000),

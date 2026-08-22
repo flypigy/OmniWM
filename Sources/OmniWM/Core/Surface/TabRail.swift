@@ -73,14 +73,11 @@ private enum TabRailMetrics {
 
 enum TabRailOwner: Hashable {
     case niriColumn(NodeId)
-    case dwindleTile(DwindleTileId)
 
     fileprivate var surfaceIdentifier: String {
         switch self {
         case let .niriColumn(id):
             "niri-column-\(id.uuid.uuidString)"
-        case let .dwindleTile(id):
-            "dwindle-tile-\(id.uuidString)"
         }
     }
 }

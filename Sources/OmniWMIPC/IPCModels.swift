@@ -76,7 +76,6 @@ public enum IPCErrorCode: String, Codable, Equatable, Sendable, Error {
     case protocolMismatch = "protocol_mismatch"
     case disabled = "ignored_disabled"
     case overviewOpen = "ignored_overview"
-    case layoutMismatch = "layout_mismatch"
     case unauthorized = "unauthorized"
     case staleWindowId = "stale_window_id"
     case notFound = "not_found"
@@ -106,11 +105,6 @@ public enum IPCDirection: String, Codable, Equatable, Sendable {
     case down
 }
 
-public enum IPCResizeAxis: String, Codable, Equatable, Sendable {
-    case horizontal
-    case vertical
-}
-
 public enum IPCWindowMode: String, Codable, Equatable, Sendable {
     case tiling
     case floating
@@ -119,7 +113,6 @@ public enum IPCWindowMode: String, Codable, Equatable, Sendable {
 public enum IPCWorkspaceLayout: String, Codable, Equatable, Sendable {
     case defaultLayout = "default"
     case niri
-    case dwindle
 }
 
 public enum IPCHiddenReason: String, Codable, Equatable, Sendable {
@@ -146,11 +139,6 @@ public enum IPCRuleLayout: String, Codable, Equatable, Sendable {
     case auto
     case tile
     case float
-}
-
-public enum IPCResizeOperation: String, Codable, Equatable, Sendable {
-    case grow
-    case shrink
 }
 
 public struct IPCWorkspaceRef: Codable, Equatable, Sendable {
@@ -262,18 +250,9 @@ public enum IPCCommandName: String, Codable, CaseIterable, Equatable, Sendable {
     case setWindowSecondarySpan = "set-window-secondary-span"
     case swapWorkspaceWithMonitor = "swap-workspace-with-monitor"
     case balanceSizes = "balance-sizes"
-    case moveToRoot = "move-to-root"
-    case toggleSplit = "toggle-split"
-    case swapSplit = "swap-split"
-    case resize
-    case resizeFocused = "resize-focused"
-    case preselect
-    case preselectClear = "preselect-clear"
     case openCommandPalette = "open-command-palette"
     case raiseAllFloatingWindows = "raise-all-floating-windows"
     case rescueOffscreenWindows = "rescue-offscreen-windows"
-    case toggleWorkspaceLayout = "toggle-workspace-layout"
-    case setWorkspaceLayout = "set-workspace-layout"
     case toggleFullscreen = "toggle-fullscreen"
     case toggleNativeFullscreen = "toggle-native-fullscreen"
     case toggleOverview = "toggle-overview"
@@ -320,9 +299,6 @@ public struct IPCSizeChange: Codable, Equatable, Sendable {
 public enum IPCCommandArgumentValue: Equatable, Sendable {
     case direction(IPCDirection)
     case integer(Int)
-    case layout(IPCWorkspaceLayout)
-    case resizeAxis(IPCResizeAxis)
-    case resizeOperation(IPCResizeOperation)
     case sizeChange(IPCSizeChange)
 }
 
@@ -392,18 +368,9 @@ public enum IPCCommandRequest: Equatable, Sendable {
     case setWindowSecondarySpan(change: IPCSizeChange)
     case swapWorkspaceWithMonitor(direction: IPCDirection)
     case balanceSizes
-    case moveToRoot
-    case toggleSplit
-    case swapSplit
-    case resize(axis: IPCResizeAxis, operation: IPCResizeOperation)
-    case resizeFocused(operation: IPCResizeOperation)
-    case preselect(direction: IPCDirection)
-    case preselectClear
     case openCommandPalette
     case raiseAllFloatingWindows
     case rescueOffscreenWindows
-    case toggleWorkspaceLayout
-    case setWorkspaceLayout(layout: IPCWorkspaceLayout)
     case toggleFullscreen
     case toggleNativeFullscreen
     case toggleOverview
@@ -535,30 +502,12 @@ public enum IPCCommandRequest: Equatable, Sendable {
             .swapWorkspaceWithMonitor
         case .balanceSizes:
             .balanceSizes
-        case .moveToRoot:
-            .moveToRoot
-        case .toggleSplit:
-            .toggleSplit
-        case .swapSplit:
-            .swapSplit
-        case .resize:
-            .resize
-        case .resizeFocused:
-            .resizeFocused
-        case .preselect:
-            .preselect
-        case .preselectClear:
-            .preselectClear
         case .openCommandPalette:
             .openCommandPalette
         case .raiseAllFloatingWindows:
             .raiseAllFloatingWindows
         case .rescueOffscreenWindows:
             .rescueOffscreenWindows
-        case .toggleWorkspaceLayout:
-            .toggleWorkspaceLayout
-        case .setWorkspaceLayout:
-            .setWorkspaceLayout
         case .toggleFullscreen:
             .toggleFullscreen
         case .toggleNativeFullscreen:
@@ -599,35 +548,11 @@ public enum IPCCommandRequest: Equatable, Sendable {
             return value
         }
 
-        func requireLayout() throws -> IPCWorkspaceLayout {
-            guard argumentValues.count == 1, case let .layout(layout) = argumentValues[0] else {
-                throw IPCCommandRequestConstructionError.invalidArgumentType
-            }
-            return layout
-        }
-
         func requireSizeChange() throws -> IPCSizeChange {
             guard argumentValues.count == 1, case let .sizeChange(change) = argumentValues[0] else {
                 throw IPCCommandRequestConstructionError.invalidArgumentType
             }
             return change
-        }
-
-        func requireResizeArguments() throws -> (axis: IPCResizeAxis, operation: IPCResizeOperation) {
-            guard argumentValues.count == 2,
-                  case let .resizeAxis(axis) = argumentValues[0],
-                  case let .resizeOperation(operation) = argumentValues[1]
-            else {
-                throw IPCCommandRequestConstructionError.invalidArgumentType
-            }
-            return (axis, operation)
-        }
-
-        func requireResizeOperation() throws -> IPCResizeOperation {
-            guard argumentValues.count == 1, case let .resizeOperation(operation) = argumentValues[0] else {
-                throw IPCCommandRequestConstructionError.invalidArgumentType
-            }
-            return operation
         }
 
         func requireWorkspaceAndDirection() throws -> (workspaceNumber: Int, direction: IPCDirection) {
@@ -809,25 +734,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
         case .balanceSizes:
             try requireNoArguments()
             self = .balanceSizes
-        case .moveToRoot:
-            try requireNoArguments()
-            self = .moveToRoot
-        case .toggleSplit:
-            try requireNoArguments()
-            self = .toggleSplit
-        case .swapSplit:
-            try requireNoArguments()
-            self = .swapSplit
-        case .resize:
-            let arguments = try requireResizeArguments()
-            self = .resize(axis: arguments.axis, operation: arguments.operation)
-        case .resizeFocused:
-            self = .resizeFocused(operation: try requireResizeOperation())
-        case .preselect:
-            self = .preselect(direction: try requireDirection())
-        case .preselectClear:
-            try requireNoArguments()
-            self = .preselectClear
         case .openCommandPalette:
             try requireNoArguments()
             self = .openCommandPalette
@@ -837,11 +743,6 @@ public enum IPCCommandRequest: Equatable, Sendable {
         case .rescueOffscreenWindows:
             try requireNoArguments()
             self = .rescueOffscreenWindows
-        case .toggleWorkspaceLayout:
-            try requireNoArguments()
-            self = .toggleWorkspaceLayout
-        case .setWorkspaceLayout:
-            self = .setWorkspaceLayout(layout: try requireLayout())
         case .toggleFullscreen:
             try requireNoArguments()
             self = .toggleFullscreen
@@ -895,19 +796,6 @@ extension IPCCommandRequest: Codable {
     private struct IPCWorkspaceOnMonitorArguments: Codable, Equatable, Sendable {
         let workspaceNumber: Int
         let direction: IPCDirection
-    }
-
-    private struct IPCLayoutArguments: Codable, Equatable, Sendable {
-        let layout: IPCWorkspaceLayout
-    }
-
-    private struct IPCResizeArguments: Codable, Equatable, Sendable {
-        let axis: IPCResizeAxis
-        let operation: IPCResizeOperation
-    }
-
-    private struct IPCResizeOperationArguments: Codable, Equatable, Sendable {
-        let operation: IPCResizeOperation
     }
 
     private struct IPCSizeChangeArguments: Codable, Equatable, Sendable {
@@ -1055,34 +943,12 @@ extension IPCCommandRequest: Codable {
             self = .swapWorkspaceWithMonitor(direction: arguments.direction)
         case .balanceSizes:
             self = .balanceSizes
-        case .moveToRoot:
-            self = .moveToRoot
-        case .toggleSplit:
-            self = .toggleSplit
-        case .swapSplit:
-            self = .swapSplit
-        case .resize:
-            let arguments = try container.decode(IPCResizeArguments.self, forKey: .arguments)
-            self = .resize(axis: arguments.axis, operation: arguments.operation)
-        case .resizeFocused:
-            let arguments = try container.decode(IPCResizeOperationArguments.self, forKey: .arguments)
-            self = .resizeFocused(operation: arguments.operation)
-        case .preselect:
-            let arguments = try container.decode(IPCDirectionArguments.self, forKey: .arguments)
-            self = .preselect(direction: arguments.direction)
-        case .preselectClear:
-            self = .preselectClear
         case .openCommandPalette:
             self = .openCommandPalette
         case .raiseAllFloatingWindows:
             self = .raiseAllFloatingWindows
         case .rescueOffscreenWindows:
             self = .rescueOffscreenWindows
-        case .toggleWorkspaceLayout:
-            self = .toggleWorkspaceLayout
-        case .setWorkspaceLayout:
-            let arguments = try container.decode(IPCLayoutArguments.self, forKey: .arguments)
-            self = .setWorkspaceLayout(layout: arguments.layout)
         case .toggleFullscreen:
             self = .toggleFullscreen
         case .toggleNativeFullscreen:
@@ -1230,33 +1096,12 @@ extension IPCCommandRequest: Codable {
             try container.encode(IPCDirectionArguments(direction: direction), forKey: .arguments)
         case .balanceSizes:
             break
-        case .moveToRoot:
-            break
-        case .toggleSplit:
-            break
-        case .swapSplit:
-            break
-        case let .resize(axis, operation):
-            try container.encode(
-                IPCResizeArguments(axis: axis, operation: operation),
-                forKey: .arguments
-            )
-        case let .resizeFocused(operation):
-            try container.encode(IPCResizeOperationArguments(operation: operation), forKey: .arguments)
-        case let .preselect(direction):
-            try container.encode(IPCDirectionArguments(direction: direction), forKey: .arguments)
-        case .preselectClear:
-            break
         case .openCommandPalette:
             break
         case .raiseAllFloatingWindows:
             break
         case .rescueOffscreenWindows:
             break
-        case .toggleWorkspaceLayout:
-            break
-        case let .setWorkspaceLayout(layout):
-            try container.encode(IPCLayoutArguments(layout: layout), forKey: .arguments)
         case .toggleFullscreen:
             break
         case .toggleNativeFullscreen:

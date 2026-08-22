@@ -112,11 +112,6 @@ final class WMController {
         set { workspaceManager.niriEngine = newValue }
     }
 
-    var dwindleEngine: DwindleLayoutEngine? {
-        get { workspaceManager.dwindleEngine }
-        set { workspaceManager.dwindleEngine = newValue }
-    }
-
     let tabRailManager = TabRailManager()
     @ObservationIgnored
     lazy var nativeFullscreenPlaceholderManager: NativeFullscreenPlaceholderManager = {
@@ -192,10 +187,6 @@ final class WMController {
     private(set) lazy var layoutRefreshController = LayoutRefreshController(controller: self)
     var niriLayoutHandler: NiriLayoutHandler {
         layoutRefreshController.niriHandler
-    }
-
-    var dwindleLayoutHandler: DwindleLayoutHandler {
-        layoutRefreshController.dwindleHandler
     }
 
     @ObservationIgnored
@@ -289,12 +280,6 @@ final class WMController {
                     visualIndex: visualIndex,
                     expectedToken: token
                 )
-            case .dwindleTile:
-                dwindleLayoutHandler.selectGroupMember(
-                    info: info,
-                    visualIndex: visualIndex,
-                    expectedToken: token
-                )
             }
         }
         workspaceManager.onSessionStateChanged = { [weak self] in
@@ -373,20 +358,9 @@ final class WMController {
             defaultContainerPrimarySpan: settings.niriDefaultContainerPrimarySpan
         )
 
-        if dwindleEngine == nil {
-            enableDwindleLayout()
-        }
-        updateDwindleConfig(
-            smartSplit: settings.dwindleSmartSplit,
-            defaultSplitRatio: settings.dwindleDefaultSplitRatio,
-            splitWidthMultiplier: settings.dwindleSplitWidthMultiplier,
-            singleWindowFit: settings.dwindleSingleWindowFit
-        )
-
         updateWorkspaceConfig()
         updateMonitorOrientations()
         updateMonitorNiriSettings()
-        updateMonitorDwindleSettings()
         updateMonitorGapSettings()
         updateAppRules()
 
@@ -737,17 +711,6 @@ final class WMController {
         layoutRefreshController.requestRelayout(reason: .monitorSettingsChanged)
     }
 
-    func updateMonitorDwindleSettings() {
-        guard let engine = dwindleEngine else { return }
-        workspaceManager.withEngineMutationScope {
-            for monitor in workspaceManager.monitors {
-                let resolved = settings.resolvedDwindleSettings(for: monitor)
-                engine.updateMonitorSettings(resolved, for: monitor.id)
-            }
-        }
-        layoutRefreshController.requestRelayout(reason: .monitorSettingsChanged)
-    }
-
     func updateMonitorGapSettings() {
         layoutRefreshController.requestRelayout(reason: .monitorSettingsChanged)
         publishDisplayChanged()
@@ -1052,26 +1015,6 @@ final class WMController {
 
     func balanceNiriSizesAllWorkspaces() {
         niriLayoutHandler.balanceSizesAllWorkspaces()
-    }
-
-    func enableDwindleLayout() {
-        dwindleLayoutHandler.enableDwindleLayout()
-    }
-
-    func updateDwindleConfig(
-        smartSplit: Bool? = nil,
-        defaultSplitRatio: CGFloat? = nil,
-        splitWidthMultiplier: CGFloat? = nil,
-        singleWindowFit: SingleWindowFit? = nil,
-        innerGap: CGFloat? = nil
-    ) {
-        dwindleLayoutHandler.updateDwindleConfig(
-            smartSplit: smartSplit,
-            defaultSplitRatio: defaultSplitRatio,
-            splitWidthMultiplier: splitWidthMultiplier,
-            singleWindowFit: singleWindowFit,
-            innerGap: innerGap
-        )
     }
 
     func monitorForInteraction() -> Monitor? {
@@ -2501,45 +2444,23 @@ final class WMController {
     ) {
         let monitorId = workspaceManager.monitorId(for: workspaceId)
 
-        switch workspaceManager.activeLayoutKind(for: workspaceId) {
-        case .niri:
-            if let engine = niriEngine {
-                let preferredTokenNode: NiriWindow? = preferredToken.flatMap { token in
-                    guard !isManagedWindowSuppressedByMacOSHide(token) else { return nil }
-                    return engine.findNode(for: token, in: workspaceId)
-                }
-                let preferredNode = preferredNodeId
-                    .flatMap { engine.findNode(by: $0, in: workspaceId) as? NiriWindow }
-                    .flatMap { node in
-                        isManagedWindowSuppressedByMacOSHide(node.token) ? nil : node
-                    }
-                if let node = preferredTokenNode ?? preferredNode {
-                    _ = workspaceManager.commitWorkspaceSelection(
-                        nodeId: node.id,
-                        focusedToken: node.token,
-                        in: workspaceId,
-                        onMonitor: monitorId
-                    )
-                    return
-                }
+        if let engine = niriEngine {
+            let preferredTokenNode: NiriWindow? = preferredToken.flatMap { token in
+                guard !isManagedWindowSuppressedByMacOSHide(token) else { return nil }
+                return engine.findNode(for: token, in: workspaceId)
             }
-        case .dwindle:
-            if let token = dwindleEngine?.selectedNode(in: workspaceId)?.windowToken,
-               !isManagedWindowSuppressedByMacOSHide(token)
-            {
+            let preferredNode = preferredNodeId
+                .flatMap { engine.findNode(by: $0, in: workspaceId) as? NiriWindow }
+                .flatMap { node in
+                    isManagedWindowSuppressedByMacOSHide(node.token) ? nil : node
+                }
+            if let node = preferredTokenNode ?? preferredNode {
                 _ = workspaceManager.commitWorkspaceSelection(
-                    nodeId: nil,
-                    focusedToken: token,
+                    nodeId: node.id,
+                    focusedToken: node.token,
                     in: workspaceId,
                     onMonitor: monitorId
                 )
-                return
-            }
-            if let preferredToken,
-               !isManagedWindowSuppressedByMacOSHide(preferredToken),
-               dwindleEngine?.findNode(for: preferredToken, in: workspaceId) != nil
-            {
-                commitWorkspaceFocusCandidate(preferredToken, in: workspaceId)
                 return
             }
         }
@@ -2547,44 +2468,22 @@ final class WMController {
         _ = workspaceManager.resolveAndSetWorkspaceFocusToken(in: workspaceId, onMonitor: monitorId)
     }
 
-    @discardableResult
     private func commitWorkspaceFocusCandidate(
         _ token: WindowToken,
-        in workspaceId: WorkspaceDescriptor.ID,
-        focusDwindleCandidate: Bool = false
-    ) -> Bool {
+        in workspaceId: WorkspaceDescriptor.ID
+    ) {
         let monitorId = workspaceManager.monitorId(for: workspaceId)
 
-        switch workspaceManager.activeLayoutKind(for: workspaceId) {
-        case .niri:
-            if let engine = niriEngine,
-               let node = engine.findNode(for: token, in: workspaceId)
-            {
-                _ = workspaceManager.commitWorkspaceSelection(
-                    nodeId: node.id,
-                    focusedToken: token,
-                    in: workspaceId,
-                    onMonitor: monitorId
-                )
-                return false
-            }
-        case .dwindle:
-            if let engine = dwindleEngine,
-               engine.findNode(for: token, in: workspaceId) != nil
-            {
-                _ = workspaceManager.commitWorkspaceSelection(
-                    nodeId: nil,
-                    focusedToken: token,
-                    in: workspaceId,
-                    onMonitor: monitorId
-                )
-                let activation = dwindleLayoutHandler.activateWindow(
-                    token,
-                    in: workspaceId,
-                    focusAfterLayout: focusDwindleCandidate
-                )
-                return focusDwindleCandidate && activation != .missing
-            }
+        if let engine = niriEngine,
+           let node = engine.findNode(for: token, in: workspaceId)
+        {
+            _ = workspaceManager.commitWorkspaceSelection(
+                nodeId: node.id,
+                focusedToken: token,
+                in: workspaceId,
+                onMonitor: monitorId
+            )
+            return
         }
 
         _ = workspaceManager.applySessionPatch(
@@ -2595,7 +2494,6 @@ final class WMController {
                 plannedSeq: workspaceManager.worldSeq
             )
         )
-        return false
     }
 
     func ensureFocusedTokenValid(
@@ -2618,14 +2516,8 @@ final class WMController {
                entry.workspaceId == workspaceId,
                !isManagedWindowSuppressedByMacOSHide(preferredRecoveryToken)
             {
-                let routedDwindleFocus = commitWorkspaceFocusCandidate(
-                    preferredRecoveryToken,
-                    in: workspaceId,
-                    focusDwindleCandidate: true
-                )
-                if !routedDwindleFocus {
-                    focusWindow(preferredRecoveryToken)
-                }
+                commitWorkspaceFocusCandidate(preferredRecoveryToken, in: workspaceId)
+                focusWindow(preferredRecoveryToken)
                 return
             }
         }
@@ -2645,14 +2537,8 @@ final class WMController {
             return
         }
 
-        let routedDwindleFocus = commitWorkspaceFocusCandidate(
-            nextFocusToken,
-            in: workspaceId,
-            focusDwindleCandidate: true
-        )
-        if !routedDwindleFocus {
-            focusWindow(nextFocusToken)
-        }
+        commitWorkspaceFocusCandidate(nextFocusToken, in: workspaceId)
+        focusWindow(nextFocusToken)
     }
 
     func moveMouseToWindow(_ handle: WindowHandle, preferredFrame: CGRect? = nil) {
@@ -2909,9 +2795,6 @@ extension WMController {
             }
             return
         }
-        if deferInactiveDwindleGroupFocus(entry, origin: origin) {
-            return
-        }
 
         let workspaceId = entry.workspaceId
         let request = intentLedger.beginManagedRequest(
@@ -2940,47 +2823,15 @@ extension WMController {
         )
     }
 
-    private func deferInactiveDwindleGroupFocus(
-        _ entry: WindowState,
-        origin: ManagedFocusOrigin
-    ) -> Bool {
-        let workspaceId = entry.workspaceId
-        guard entry.mode == .tiling,
-              entry.layoutReason == .standard,
-              workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
-              let monitorId = workspaceManager.monitorId(for: workspaceId),
-              workspaceManager.activeWorkspace(on: monitorId)?.id == workspaceId,
-              let snapshot = dwindleEngine?.tileSnapshot(for: entry.token, in: workspaceId),
-              snapshot.members.count > 1,
-              snapshot.activeToken != entry.token
-        else {
-            return false
-        }
-
-        return dwindleLayoutHandler.activateWindow(
-            entry.token,
-            in: workspaceId,
-            origin: origin
-        ) == .activated
-    }
-
     func focusWindow(_ handle: WindowHandle) {
         focusWindow(handle.id)
     }
 
     func preferredKeyboardFocusFrame(for token: WindowToken) -> CGRect? {
-        if let workspaceId = workspaceManager.entry(for: token)?.workspaceId {
-            switch workspaceManager.activeLayoutKind(for: workspaceId) {
-            case .niri:
-                if let node = niriEngine?.findNode(for: token, in: workspaceId) {
-                    return node.renderedFrame ?? node.frame
-                }
-            case .dwindle:
-                if let engine = dwindleEngine {
-                    return engine.contentFrame(for: token, in: workspaceId)
-                        ?? engine.findNode(for: token, in: workspaceId)?.cachedFrame
-                }
-            }
+        if let workspaceId = workspaceManager.entry(for: token)?.workspaceId,
+           let node = niriEngine?.findNode(for: token, in: workspaceId)
+        {
+            return node.renderedFrame ?? node.frame
         }
         if let floatingState = workspaceManager.floatingState(for: token) {
             return floatingState.lastFrame

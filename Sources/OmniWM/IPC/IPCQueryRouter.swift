@@ -657,8 +657,6 @@ final class IPCQueryRouter {
             .defaultLayout
         case .niri:
             .niri
-        case .dwindle:
-            .dwindle
         }
     }
 

@@ -49,7 +49,6 @@ final class MouseEventHandler {
 
     private enum FocusFollowsMouseTarget {
         case niri(workspaceId: WorkspaceDescriptor.ID, window: NiriWindow)
-        case dwindle(workspaceId: WorkspaceDescriptor.ID, token: WindowToken)
         case floating(token: WindowToken)
     }
 
@@ -118,7 +117,6 @@ final class MouseEventHandler {
         var isMoving: Bool = false
         var activeInteractionButton: MouseButton?
         var capturedInteractionButton: MouseButton?
-        var resizeLayout: LayoutType?
         var awaitsNativeTitleBarDragTarget = false
         var nativeTitleBarDragFallbackToken: WindowToken?
         var nativeTitleBarDragFallbackReleased = false
@@ -711,7 +709,6 @@ final class MouseEventHandler {
             finishActiveResize()
             state.isResizing = false
             state.activeInteractionButton = nil
-            state.resizeLayout = nil
         }
 
         resetHoveredEdgesIfNeeded()
@@ -734,21 +731,7 @@ final class MouseEventHandler {
     }
 
     private func finishActiveResize() {
-        if state.resizeLayout == .dwindle {
-            finishDwindleResize()
-        } else {
-            finishNiriResize()
-        }
-    }
-
-    private func finishDwindleResize() {
-        guard let controller, let engine = controller.dwindleEngine else { return }
-        let workspaceId = engine.interactiveResize?.workspaceId
-        guard engine.interactiveResizeEnd(), let workspaceId else { return }
-        controller.workspaceManager.recordLayoutOperation(.splitRatioChanged, in: workspaceId, source: .mouse)
-        if controller.hasStartedServices {
-            controller.layoutRefreshController.requestImmediateRelayout(reason: .interactiveGesture)
-        }
+        finishNiriResize()
     }
 
     private func finishNiriResize() {
@@ -907,12 +890,6 @@ final class MouseEventHandler {
             }
         }
 
-        let layoutType = controller.workspaceManager.descriptor(for: wsId)
-            .map { controller.settings.layoutType(for: $0.name) }
-        if layoutType == .dwindle {
-            return handleDwindleMouseDown(at: location, modifiers: modifiers, button: button, wsId: wsId)
-        }
-
         guard let engine = controller.niriEngine else { return false }
 
         if button == .left,
@@ -1009,48 +986,6 @@ final class MouseEventHandler {
         return false
     }
 
-    private func handleDwindleMouseDown(
-        at location: CGPoint,
-        modifiers: CGEventFlags,
-        button: MouseButton,
-        wsId: WorkspaceDescriptor.ID
-    ) -> Bool {
-        guard let controller, let engine = controller.dwindleEngine else { return false }
-        guard button == .right,
-              Self.modifierFlagsMatch(modifiers, required: controller.settings.mouseResizeModifierKey.cgEventFlag)
-        else { return false }
-
-        let now = controller.animationClock.now()
-        guard let token = engine.hitTestFocusableWindow(point: location, in: wsId, at: now),
-              let node = engine.findNode(for: token, in: wsId),
-              let frame = node.presentedFrame(at: now)
-        else { return false }
-
-        let edges = resizeEdges(for: location, in: frame)
-        guard let monitor = controller.workspaceManager.monitor(for: wsId) else { return false }
-        controller.dwindleLayoutHandler.refreshEngineConstraints(workspaceId: wsId, monitor: monitor)
-        let innerGap = controller.settings.resolvedDwindleSettings(for: monitor).innerGap
-        guard engine.interactiveResizeBegin(
-            token: token,
-            edges: edges,
-            startLocation: location,
-            in: wsId,
-            innerGap: innerGap
-        ) else {
-            return false
-        }
-
-        controller.layoutRefreshController.stopDwindleAnimation(for: monitor.displayId)
-        engine.cancelAnimations(in: wsId)
-        state.isResizing = true
-        state.activeInteractionButton = button
-        state.capturedInteractionButton = button
-        state.currentHoveredEdges = edges
-        state.resizeLayout = .dwindle
-        edges.cursor.set()
-        return true
-    }
-
     private func resizeEdges(for location: CGPoint, in frame: CGRect) -> ResizeEdge {
         var edges: ResizeEdge = location.x < frame.midX ? [.left] : [.right]
         edges.insert(location.y < frame.midY ? .bottom : .top)
@@ -1129,19 +1064,6 @@ final class MouseEventHandler {
         guard state.isResizing else { return }
         guard shouldAcceptInteractionButton(button) else { return }
 
-        if state.resizeLayout == .dwindle {
-            guard let engine = controller.dwindleEngine,
-                  let wsId = engine.interactiveResize?.workspaceId
-            else {
-                cancelActiveMouseInteraction()
-                return
-            }
-            if engine.interactiveResizeUpdate(currentLocation: location) {
-                controller.layoutRefreshController.renderDwindleInteractiveResize(for: wsId)
-            }
-            return
-        }
-
         guard let engine = controller.niriEngine,
               let resize = engine.interactiveResize,
               let monitor = controller.workspaceManager.monitor(for: resize.workspaceId)
@@ -1185,21 +1107,10 @@ final class MouseEventHandler {
         workspaceId: WorkspaceDescriptor.ID
     ) -> WindowToken? {
         guard let controller else { return nil }
-        let layoutType = controller.workspaceManager.descriptor(for: workspaceId)
-            .map { controller.settings.layoutType(for: $0.name) }
-        let token: WindowToken?
-        if layoutType == .dwindle {
-            token = controller.dwindleEngine?.hitTestFocusableWindow(
-                point: location,
-                in: workspaceId,
-                at: controller.animationClock.now()
-            )
-        } else {
-            token = controller.niriEngine?.hitTestFocusableWindow(
-                point: location,
-                in: workspaceId
-            )?.token
-        }
+        let token = controller.niriEngine?.hitTestFocusableWindow(
+            point: location,
+            in: workspaceId
+        )?.token
         guard let token,
               controller.workspaceManager.entry(for: token)?.mode == .tiling
         else { return nil }
@@ -1680,7 +1591,6 @@ final class MouseEventHandler {
         finishActiveResize()
         state.isResizing = false
         state.activeInteractionButton = nil
-        state.resizeLayout = nil
         NSCursor.arrow.set()
         state.currentHoveredEdges = []
     }
@@ -1812,8 +1722,7 @@ final class MouseEventHandler {
                       forWindowId: windowIdUnderPointer,
                       inVisibleWorkspaces: true
                   ),
-                  controller.isManagedWindowDisplayable(entry.token),
-                  let workspace = controller.workspaceManager.descriptor(for: entry.workspaceId)
+                  controller.isManagedWindowDisplayable(entry.token)
             else {
                 return nil
             }
@@ -1823,68 +1732,36 @@ final class MouseEventHandler {
                 return .floating(token: entry.token)
 
             case .tiling:
-                switch controller.settings.layoutType(for: workspace.name) {
-                case .niri,
-                     .defaultLayout:
-                    guard let window = controller.niriEngine?.findNode(
-                        for: entry.token,
-                        in: entry.workspaceId
-                    ), controller.niriEngine?.isProjectedFocusableWindow(
-                        window,
-                        in: entry.workspaceId
-                    ) == true else {
-                        return nil
-                    }
-                    return .niri(workspaceId: entry.workspaceId, window: window)
-
-                case .dwindle:
-                    guard controller.dwindleEngine?.findNode(
-                        for: entry.token,
-                        in: entry.workspaceId
-                    ) != nil else {
-                        return nil
-                    }
-                    return .dwindle(workspaceId: entry.workspaceId, token: entry.token)
+                guard let window = controller.niriEngine?.findNode(
+                    for: entry.token,
+                    in: entry.workspaceId
+                ), controller.niriEngine?.isProjectedFocusableWindow(
+                    window,
+                    in: entry.workspaceId
+                ) == true else {
+                    return nil
                 }
+                return .niri(workspaceId: entry.workspaceId, window: window)
             }
         }
 
-        guard let workspaceId = workspaceIdForPointer(at: location),
-              let workspace = controller.workspaceManager.descriptor(for: workspaceId)
+        guard let workspaceId = workspaceIdForPointer(at: location)
         else {
             return nil
         }
 
-        switch controller.settings.layoutType(for: workspace.name) {
-        case .niri,
-             .defaultLayout:
-            guard let engine = controller.niriEngine,
-                  let window = engine.hitTestFocusableWindow(point: location, in: workspaceId)
-            else {
-                return nil
-            }
-            return .niri(workspaceId: workspaceId, window: window)
-
-        case .dwindle:
-            guard let engine = controller.dwindleEngine else { return nil }
-            let presentationTime = controller.animationClock.now()
-            guard let token = engine.hitTestFocusableWindow(
-                point: location,
-                in: workspaceId,
-                at: presentationTime
-            ) else {
-                return nil
-            }
-            return .dwindle(workspaceId: workspaceId, token: token)
+        guard let engine = controller.niriEngine,
+              let window = engine.hitTestFocusableWindow(point: location, in: workspaceId)
+        else {
+            return nil
         }
+        return .niri(workspaceId: workspaceId, window: window)
     }
 
     private func focusFollowsMouseToken(for target: FocusFollowsMouseTarget) -> WindowToken {
         switch target {
         case let .niri(_, window):
             window.token
-        case let .dwindle(_, token):
-            token
         case let .floating(token):
             token
         }
@@ -1898,13 +1775,6 @@ final class MouseEventHandler {
             controller.niriLayoutHandler.activatePointerHoveredWindow(
                 window,
                 in: workspaceId
-            )
-        case let .dwindle(workspaceId, token):
-            controller.dwindleLayoutHandler.activateWindow(
-                token,
-                in: workspaceId,
-                origin: .pointerHover,
-                layoutRefresh: false
             )
         case let .floating(token):
             controller.focusWindow(token, origin: .pointerHover)
@@ -2015,13 +1885,7 @@ final class MouseEventHandler {
         guard let monitor = location.monitorApproximation(in: controller.workspaceManager.monitors),
               let workspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)
         else { return nil }
-        let supportsColumnScroll = switch controller.settings.layoutType(for: workspace.name) {
-        case .niri,
-             .defaultLayout:
-            controller.niriEngine != nil
-        case .dwindle:
-            false
-        }
+        let supportsColumnScroll = controller.niriEngine != nil
         guard TrackpadGestureIntent.hasCandidateMode(
             config,
             fingerCount: fingerCount,
@@ -2494,13 +2358,7 @@ final class MouseEventHandler {
             return nil
         }
 
-        switch controller.settings.layoutType(for: workspace.name) {
-        case .niri,
-             .defaultLayout:
-            return (engine, workspace.id, monitor)
-        case .dwindle:
-            return nil
-        }
+        return (engine, workspace.id, monitor)
     }
 
     private func resetGestureState() {

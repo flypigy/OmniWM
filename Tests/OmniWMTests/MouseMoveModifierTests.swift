@@ -163,33 +163,6 @@ final class MouseMoveModifierTests: NiriInteractionTestCase {
     }
 
     @MainActor
-    func testDwindleLeftDragRemainsUnchanged() throws {
-        let controller = makeController()
-        controller.settings.defaultLayoutType = .dwindle
-        controller.settings.mouseMoveModifierKey = .control
-        let monitor = makeMonitor()
-        controller.workspaceManager.applyMonitorConfigurationChange([monitor])
-        _ = try XCTUnwrap(
-            controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
-        )
-        _ = controller.workspaceManager.focusWorkspace(named: "1")
-        controller.enableDwindleLayout()
-        let worldSeq = controller.workspaceManager.worldSeq
-
-        XCTAssertFalse(
-            controller.mouseEventHandler.dispatchMouseDown(
-                at: CGPoint(x: monitor.frame.midX, y: monitor.frame.midY),
-                modifiers: .maskControl
-            )
-        )
-
-        XCTAssertFalse(controller.mouseEventHandler.state.isMoving)
-        XCTAssertNil(controller.mouseEventHandler.state.activeInteractionButton)
-        XCTAssertNil(controller.dwindleEngine?.interactiveResize)
-        XCTAssertEqual(controller.workspaceManager.worldSeq, worldSeq)
-    }
-
-    @MainActor
     private func makeFixture(pid: pid_t) throws -> Fixture {
         let controller = makeController()
         let monitor = makeMonitor()

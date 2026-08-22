@@ -738,95 +738,6 @@ enum ActionCatalog {
                 command: .balanceSizes,
                 category: .layout,
                 binding: KeyBinding(keyCode: UInt32(kVK_ANSI_B), modifiers: UInt32(optionKey | shiftKey))
-            ),
-            action(id: "moveToRoot", command: .moveToRoot, category: .layout, binding: .unassigned),
-            action(id: "toggleSplit", command: .toggleSplit, category: .layout, binding: .unassigned),
-            action(id: "swapSplit", command: .swapSplit, category: .layout, binding: .unassigned)
-        ])
-
-        specs.append(contentsOf: [
-            action(
-                id: "resizeGrow.horizontal",
-                command: .resizeAlongAxis(.horizontal, true),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced,
-                keywords: ["resize", "grow"]
-            ),
-            action(
-                id: "resizeGrow.vertical",
-                command: .resizeAlongAxis(.vertical, true),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced,
-                keywords: ["resize", "grow"]
-            ),
-            action(
-                id: "resizeShrink.horizontal",
-                command: .resizeAlongAxis(.horizontal, false),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced,
-                keywords: ["resize", "shrink"]
-            ),
-            action(
-                id: "resizeShrink.vertical",
-                command: .resizeAlongAxis(.vertical, false),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced,
-                keywords: ["resize", "shrink"]
-            ),
-            action(
-                id: "resizeFocusedWindow.grow",
-                command: .resizeFocusedWindow(true),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced,
-                keywords: ["resize", "grow"]
-            ),
-            action(
-                id: "resizeFocusedWindow.shrink",
-                command: .resizeFocusedWindow(false),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced,
-                keywords: ["resize", "shrink"]
-            ),
-            action(
-                id: "preselect.left",
-                command: .preselect(.left),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced
-            ),
-            action(
-                id: "preselect.right",
-                command: .preselect(.right),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced
-            ),
-            action(
-                id: "preselect.up",
-                command: .preselect(.up),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced
-            ),
-            action(
-                id: "preselect.down",
-                command: .preselect(.down),
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced
-            ),
-            action(
-                id: "preselectClear",
-                command: .preselectClear,
-                category: .layout,
-                binding: .unassigned,
-                visibility: .advanced
             )
         ])
 
@@ -923,17 +834,6 @@ enum ActionCatalog {
 
     private static func compatibility(for command: HotkeyCommand) -> LayoutCompatibility {
         switch command {
-        case .moveToRoot,
-             .toggleSplit,
-             .swapSplit,
-             .preselect,
-             .preselectClear,
-             .resizeAlongAxis,
-             .resizeFocusedWindow,
-             .moveColumn(.up),
-             .moveColumn(.down):
-            .dwindle
-
         case .moveWindowDownOrToWorkspaceDown,
              .moveWindowUpOrToWorkspaceUp,
              .consumeOrExpelWindowLeft,
@@ -979,8 +879,7 @@ enum ActionCatalog {
              .moveWindowUp,
              .focusWindowDownOrTop,
              .focusWindowUpOrBottom,
-             .moveColumn(.left),
-             .moveColumn(.right),
+             .moveColumn,
              .toggleFullscreen,
              .cycleSizeForward,
              .cycleSizeBackward,
@@ -1009,7 +908,6 @@ enum ActionCatalog {
              .openMenuAnywhere,
              .toggleWorkspaceBarVisibility,
              .toggleHiddenBarPanel,
-             .toggleWorkspaceLayout,
              .toggleOverview,
              .toggleSystemStats:
             .shared
@@ -1078,14 +976,6 @@ enum ActionCatalog {
         case let .moveWorkspaceToMonitor(dir): "Move Workspace to \(dir.displayName) Monitor"
         case let .swapWorkspaceWithMonitor(dir): "Swap Workspace with \(dir.displayName) Monitor"
         case .balanceSizes: "Balance Sizes"
-        case .moveToRoot: "Move to Root"
-        case .toggleSplit: "Toggle Split"
-        case .swapSplit: "Swap Split"
-        case let .resizeAlongAxis(orientation, grow):
-            "\(grow ? "Grow" : "Shrink") \(orientation == .horizontal ? "Horizontally" : "Vertically")"
-        case let .resizeFocusedWindow(grow): "\(grow ? "Grow" : "Shrink") Focused Window"
-        case let .preselect(dir): "Preselect \(dir.displayName)"
-        case .preselectClear: "Clear Preselection"
         case .workspaceBackAndForth: "Switch to Last Active Workspace"
         case let .focusWorkspaceAnywhere(idx): "Focus Workspace \(idx + 1) Anywhere"
         case let .moveWindowToWorkspaceOnMonitor(wsIdx, monDir): "Move Window to Workspace \(wsIdx + 1) on \(monDir.displayName) Monitor"
@@ -1096,7 +986,6 @@ enum ActionCatalog {
         case .openMenuAnywhere: "Open Menu Anywhere"
         case .toggleWorkspaceBarVisibility: "Toggle Workspace Bar"
         case .toggleHiddenBarPanel: "Toggle Hidden Icons Bar"
-        case .toggleWorkspaceLayout: "Toggle Workspace Layout"
         case .toggleOverview: "Toggle Overview"
         case .toggleSystemStats: "Toggle System Stats"
         }
@@ -1226,28 +1115,12 @@ enum ActionCatalog {
             .swapWorkspaceWithMonitor
         case .balanceSizes:
             .balanceSizes
-        case .moveToRoot:
-            .moveToRoot
-        case .toggleSplit:
-            .toggleSplit
-        case .swapSplit:
-            .swapSplit
-        case .resizeAlongAxis:
-            .resize
-        case .resizeFocusedWindow:
-            .resizeFocused
-        case .preselect:
-            .preselect
-        case .preselectClear:
-            .preselectClear
         case .openCommandPalette:
             .openCommandPalette
         case .raiseAllFloatingWindows:
             .raiseAllFloatingWindows
         case .rescueOffscreenWindows:
             .rescueOffscreenWindows
-        case .toggleWorkspaceLayout:
-            .toggleWorkspaceLayout
         case .toggleFullscreen:
             .toggleFullscreen
         case .toggleNativeFullscreen:

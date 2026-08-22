@@ -351,36 +351,6 @@ final class SettingsStore {
         didSet { scheduleSave() }
     }
 
-    var dwindleSmartSplit = SettingsStore.defaultExport.dwindleSmartSplit {
-        didSet { scheduleSave() }
-    }
-
-    var dwindleDefaultSplitRatio = SettingsStore.defaultExport.dwindleDefaultSplitRatio {
-        didSet { scheduleSave() }
-    }
-
-    var dwindleSplitWidthMultiplier = SettingsStore.defaultExport.dwindleSplitWidthMultiplier {
-        didSet { scheduleSave() }
-    }
-
-    var dwindleSingleWindowFit = SingleWindowFit(
-        serialized: SettingsStore.defaultExport.dwindleSingleWindowFit
-    ) {
-        didSet { scheduleSave() }
-    }
-
-    var dwindleUseGlobalGaps = SettingsStore.defaultExport.dwindleUseGlobalGaps {
-        didSet { scheduleSave() }
-    }
-
-    var dwindleMoveToRootStable = SettingsStore.defaultExport.dwindleMoveToRootStable {
-        didSet { scheduleSave() }
-    }
-
-    var monitorDwindleSettings = SettingsStore.defaultExport.monitorDwindleSettings {
-        didSet { scheduleSave() }
-    }
-
     var monitorGapSettings = SettingsStore.defaultExport.monitorGapSettings {
         didSet { scheduleSave() }
     }
@@ -647,13 +617,6 @@ final class SettingsStore {
             appRules: appRules,
             monitorOrientationSettings: monitorOrientationSettings,
             monitorNiriSettings: monitorNiriSettings,
-            dwindleSmartSplit: dwindleSmartSplit,
-            dwindleDefaultSplitRatio: dwindleDefaultSplitRatio,
-            dwindleSplitWidthMultiplier: dwindleSplitWidthMultiplier,
-            dwindleSingleWindowFit: dwindleSingleWindowFit.serialized,
-            dwindleUseGlobalGaps: dwindleUseGlobalGaps,
-            dwindleMoveToRootStable: dwindleMoveToRootStable,
-            monitorDwindleSettings: monitorDwindleSettings,
             monitorGapSettings: monitorGapSettings.filter(\.hasOverrides),
             preventSleepEnabled: preventSleepEnabled,
             updateChecksEnabled: updateChecksEnabled,
@@ -785,13 +748,6 @@ final class SettingsStore {
         monitorOrientationSettings = export.monitorOrientationSettings
         monitorNiriSettings = export.monitorNiriSettings
 
-        dwindleSmartSplit = export.dwindleSmartSplit
-        dwindleDefaultSplitRatio = export.dwindleDefaultSplitRatio
-        dwindleSplitWidthMultiplier = export.dwindleSplitWidthMultiplier
-        dwindleSingleWindowFit = SingleWindowFit(serialized: export.dwindleSingleWindowFit)
-        dwindleUseGlobalGaps = export.dwindleUseGlobalGaps
-        dwindleMoveToRootStable = export.dwindleMoveToRootStable
-        monitorDwindleSettings = export.monitorDwindleSettings
         monitorGapSettings = export.monitorGapSettings.filter(\.hasOverrides)
 
         preventSleepEnabled = export.preventSleepEnabled
@@ -1095,40 +1051,6 @@ final class SettingsStore {
             alwaysCenterSingleColumn: override?.alwaysCenterSingleColumn ?? niriAlwaysCenterSingleColumn,
             singleWindowFit: override?.singleWindowFit ?? niriSingleWindowFit,
             infiniteLoop: override?.infiniteLoop ?? niriInfiniteLoop
-        )
-    }
-
-    func dwindleSettings(for monitor: Monitor) -> MonitorDwindleSettings? {
-        MonitorSettingsStore.get(for: monitor, in: monitorDwindleSettings)
-    }
-
-    func updateDwindleSettings(_ settings: MonitorDwindleSettings, for monitor: Monitor) {
-        MonitorSettingsStore.update(settings, for: monitor, in: &monitorDwindleSettings)
-    }
-
-    func removeDwindleSettings(for monitor: Monitor) {
-        MonitorSettingsStore.remove(for: monitor, from: &monitorDwindleSettings)
-    }
-
-    func resolvedDwindleSettings(for monitor: Monitor) -> ResolvedDwindleSettings {
-        resolvedDwindleSettings(
-            override: dwindleSettings(for: monitor),
-            sharedInnerGap: resolvedGapSettings(for: monitor).innerGap
-        )
-    }
-
-    private func resolvedDwindleSettings(
-        override: MonitorDwindleSettings?,
-        sharedInnerGap: CGFloat
-    ) -> ResolvedDwindleSettings {
-        let useGlobalGaps = override?.useGlobalGaps ?? dwindleUseGlobalGaps
-        return ResolvedDwindleSettings(
-            smartSplit: override?.smartSplit ?? dwindleSmartSplit,
-            defaultSplitRatio: CGFloat(override?.defaultSplitRatio ?? dwindleDefaultSplitRatio),
-            splitWidthMultiplier: CGFloat(override?.splitWidthMultiplier ?? dwindleSplitWidthMultiplier),
-            singleWindowFit: override?.singleWindowFit ?? dwindleSingleWindowFit,
-            useGlobalGaps: useGlobalGaps,
-            innerGap: useGlobalGaps ? sharedInnerGap : CGFloat(override?.innerGap ?? gapSize)
         )
     }
 

@@ -41,7 +41,6 @@ final class NiriHiddenAppProjectionTests: XCTestCase {
         XCTAssertTrue(diff.frameChanges.isEmpty)
         XCTAssertTrue(diff.visibilityChanges.isEmpty)
         XCTAssertTrue(diff.restoreChanges.isEmpty)
-        XCTAssertTrue(diff.deferredHides.isEmpty)
     }
 
     func testExcludedMiddleColumnPreservesDurableTreeAndRestoresInPlace() throws {

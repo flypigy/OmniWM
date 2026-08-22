@@ -154,7 +154,6 @@ final class DiagnosticsTraceRecorderTests: XCTestCase {
                 intervalMs: 99,
                 expectedMs: 6,
                 scrollMs: 5,
-                dwindleMs: 0,
                 closingMs: 0,
                 reconcileMs: 1,
                 totalMs: 6,

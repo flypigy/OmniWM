@@ -84,7 +84,6 @@ enum RuntimeDiagnosticsReport {
         lines.append(contentsOf: projectionSnapshots.map {
             "projection workspace=\($0.workspaceId.uuidString) expectedExcluded=\($0.expectedExcludedCount)"
                 + " niri=\(formatProjectionEngine($0.niri))"
-                + " dwindle=\(formatProjectionEngine($0.dwindle))"
         })
         return lines.joined(separator: "\n")
     }

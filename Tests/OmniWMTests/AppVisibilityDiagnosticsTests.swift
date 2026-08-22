@@ -14,7 +14,6 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
             controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
         )
         controller.enableNiriLayout()
-        controller.enableDwindleLayout()
         _ = controller.workspaceManager.focusWorkspace(named: "1")
         let token = addWindow(pid: 881_001, windowId: 881_101, workspaceId: workspaceId, controller: controller)
         let hiddenState = HiddenState(
@@ -67,7 +66,6 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
         XCTAssertTrue(report.contains("sync=unverified-os"))
         XCTAssertTrue(report.contains("projection workspace=\(workspaceId.uuidString) expectedExcluded=1"))
         XCTAssertTrue(report.contains("niri=excluded:1,missing:0,unexpected:0,match:true"), report)
-        XCTAssertTrue(report.contains("dwindle=excluded:1,missing:0,unexpected:0,match:true"), report)
     }
 
     func testReportSurfacesVisibilityFenceDesynchronization() throws {
@@ -92,14 +90,9 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
             controller.workspaceManager.workspaceId(for: "1", createIfMissing: true)
         )
         controller.enableNiriLayout()
-        controller.enableDwindleLayout()
         let staleToken = WindowToken(pid: 881_005, windowId: 881_105)
         controller.workspaceManager.withEngineMutationScope(in: workspaceId) {
             controller.workspaceManager.niriEngine?.setProjectionExclusions(
-                [staleToken],
-                in: workspaceId
-            )
-            controller.workspaceManager.dwindleEngine?.setExcludedTokens(
                 [staleToken],
                 in: workspaceId
             )
@@ -109,7 +102,6 @@ final class AppVisibilityDiagnosticsTests: XCTestCase {
 
         XCTAssertTrue(report.contains("projection workspace=\(workspaceId.uuidString) expectedExcluded=0"))
         XCTAssertTrue(report.contains("niri=excluded:1,missing:0,unexpected:1,match:false"), report)
-        XCTAssertTrue(report.contains("dwindle=excluded:1,missing:0,unexpected:1,match:false"), report)
     }
 
     func testParkAuditExcludesMacOSHiddenWindowsFromVisibleAndStrayClassification() throws {

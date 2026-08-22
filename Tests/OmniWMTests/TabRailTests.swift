@@ -19,9 +19,9 @@ final class TabRailTests: XCTestCase {
             activeVisualIndex: 0,
             activeWindowId: nil
         )
-        let dwindleInfo = TabRailInfo(
+        let otherNiriInfo = TabRailInfo(
             workspaceId: workspaceId,
-            owner: .dwindleTile(UUID()),
+            owner: .niriColumn(NodeId()),
             plannedSeq: 1,
             tileFrame: frame,
             tabCount: 2,
@@ -29,15 +29,15 @@ final class TabRailTests: XCTestCase {
             activeWindowId: nil
         )
 
-        XCTAssertNotEqual(niriInfo.key, dwindleInfo.key)
+        XCTAssertNotEqual(niriInfo.key, otherNiriInfo.key)
         XCTAssertEqual(niriInfo.key.workspaceId, workspaceId)
-        XCTAssertEqual(dwindleInfo.key.workspaceId, workspaceId)
+        XCTAssertEqual(otherNiriInfo.key.workspaceId, workspaceId)
     }
 
     func testDefaultTabsClampActiveSelection() {
         let info = TabRailInfo(
             workspaceId: WorkspaceDescriptor.ID(),
-            owner: .dwindleTile(UUID()),
+            owner: .niriColumn(NodeId()),
             plannedSeq: 1,
             tileFrame: .zero,
             tabCount: 3,

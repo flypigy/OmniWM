@@ -162,40 +162,6 @@ final class GapSettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testDwindleGeneralGapUsesDisplayOverrideWithoutChangingSpecificGapPrecedence() {
-        let settings = makeSettingsStore()
-        let monitor = makeMonitor(displayId: 1, name: "Built-in")
-        settings.gapSize = 16
-        settings.dwindleUseGlobalGaps = true
-        settings.updateGapSettings(
-            MonitorGapSettings(monitorName: monitor.name, monitorDisplayId: monitor.displayId, innerGap: 24),
-            for: monitor
-        )
-
-        let generalResolved = settings.resolvedDwindleSettings(for: monitor)
-        XCTAssertEqual(generalResolved.innerGap, 24)
-
-        let controller = WMController(settings: settings)
-        controller.workspaceManager.applyMonitorConfigurationChange([monitor])
-        _ = controller.workspaceManager.focusWorkspace(named: "1")
-        controller.dwindleLayoutHandler.enableDwindleLayout()
-        controller.dwindleLayoutHandler.withDwindleContext { engine, _ in
-            XCTAssertEqual(engine.settings.innerGap, 24)
-        }
-
-        settings.updateDwindleSettings(
-            MonitorDwindleSettings(
-                monitorName: monitor.name,
-                monitorDisplayId: monitor.displayId,
-                useGlobalGaps: false,
-                innerGap: 6
-            ),
-            for: monitor
-        )
-        XCTAssertEqual(settings.resolvedDwindleSettings(for: monitor).innerGap, 6)
-    }
-
-    @MainActor
     func testDisplaysQueryProjectsOnlyRequestedResolvedInnerGap() throws {
         let settings = makeSettingsStore()
         let monitor = makeMonitor(displayId: 1, name: "Built-in")
@@ -223,29 +189,22 @@ final class GapSettingsTests: XCTestCase {
 
     @MainActor
     func testNiriLayoutRoutesInnerGapByWorkspaceDisplay() throws {
-        try assertLayoutRoutesInnerGapByWorkspaceDisplay(.niri)
+        try assertLayoutRoutesInnerGapByWorkspaceDisplay()
     }
 
     @MainActor
-    func testDwindleLayoutRoutesInnerGapByWorkspaceDisplay() throws {
-        try assertLayoutRoutesInnerGapByWorkspaceDisplay(.dwindle)
-    }
-
-    @MainActor
-    private func assertLayoutRoutesInnerGapByWorkspaceDisplay(_ layout: LayoutType) throws {
+    private func assertLayoutRoutesInnerGapByWorkspaceDisplay() throws {
         let settings = makeSettingsStore()
         let left = makeMonitor(displayId: 1, name: "Left", originX: 0)
         let right = makeMonitor(displayId: 2, name: "Right", originX: 1440)
         settings.workspaceConfigurations = [
             WorkspaceConfiguration(
                 name: "1",
-                monitorAssignment: .specificDisplay(OutputId(from: left)),
-                layoutType: layout
+                monitorAssignment: .specificDisplay(OutputId(from: left))
             ),
             WorkspaceConfiguration(
                 name: "2",
-                monitorAssignment: .specificDisplay(OutputId(from: right)),
-                layoutType: layout
+                monitorAssignment: .specificDisplay(OutputId(from: right))
             )
         ]
         settings.updateGapSettings(
@@ -259,12 +218,8 @@ final class GapSettingsTests: XCTestCase {
         let controller = WMController(settings: settings)
         controller.workspaceManager.applyMonitorConfigurationChange([left, right])
         controller.workspaceManager.applySettings()
-        if layout == .niri {
-            controller.niriLayoutHandler.enableNiriLayout()
-            controller.syncMonitorsToNiriEngine()
-        } else {
-            controller.dwindleLayoutHandler.enableDwindleLayout()
-        }
+        controller.niriLayoutHandler.enableNiriLayout()
+        controller.syncMonitorsToNiriEngine()
         let leftWorkspace = try XCTUnwrap(controller.workspaceManager.workspaceId(named: "1"))
         let rightWorkspace = try XCTUnwrap(controller.workspaceManager.workspaceId(named: "2"))
         XCTAssertTrue(controller.workspaceManager.setActiveWorkspace(leftWorkspace, on: left.id))
@@ -279,15 +234,9 @@ final class GapSettingsTests: XCTestCase {
             addWindow(pid: 104, windowId: 204, to: rightWorkspace, controller: controller)
         ]
         let plans = controller.workspaceManager.withBatchedLayoutBuild {
-            if layout == .niri {
-                controller.niriLayoutHandler.layoutWithNiriEngine(
-                    activeWorkspaces: [leftWorkspace, rightWorkspace]
-                )
-            } else {
-                controller.dwindleLayoutHandler.layoutWithDwindleEngine(
-                    activeWorkspaces: [leftWorkspace, rightWorkspace]
-                )
-            }
+            controller.niriLayoutHandler.layoutWithNiriEngine(
+                activeWorkspaces: [leftWorkspace, rightWorkspace]
+            )
         }
         let leftPlan = try XCTUnwrap(plans.first { $0.workspaceId == leftWorkspace })
         let rightPlan = try XCTUnwrap(plans.first { $0.workspaceId == rightWorkspace })
@@ -300,21 +249,6 @@ final class GapSettingsTests: XCTestCase {
 
         XCTAssertEqual(separation(between: leftFrames[0], and: leftFrames[1]), 4, accuracy: 0.5)
         XCTAssertEqual(separation(between: rightFrames[0], and: rightFrames[1]), 24, accuracy: 0.5)
-    }
-
-    func testDwindleApplyGapsEdgesAreFlush() {
-        var settings = DwindleSettings()
-        settings.innerGap = 8
-        let tilingArea = CGRect(x: 0, y: 0, width: 1000, height: 1000)
-
-        let fullEdge = DwindleGapCalculator.applyGaps(nodeRect: tilingArea, tilingArea: tilingArea, settings: settings)
-        XCTAssertEqual(fullEdge, tilingArea)
-
-        let leftHalf = CGRect(x: 0, y: 0, width: 500, height: 1000)
-        let result = DwindleGapCalculator.applyGaps(nodeRect: leftHalf, tilingArea: tilingArea, settings: settings)
-        XCTAssertEqual(result.minX, 0)
-        XCTAssertEqual(result.width, 500 - settings.innerGap / 2)
-        XCTAssertEqual(result.height, 1000)
     }
 
     @MainActor

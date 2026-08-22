@@ -103,7 +103,6 @@ enum RefreshReason: String, Sendable {
     case gapsChanged
     case workspaceTransition
     case appActivationTransition
-    case workspaceLayoutToggled
     case appTerminated
     case windowRuleReevaluation
     case observedConstraintsChanged
@@ -132,7 +131,6 @@ enum RefreshReason: String, Sendable {
              .monitorSettingsChanged,
              .gapsChanged,
              .workspaceConfigChanged,
-             .workspaceLayoutToggled,
              .appTerminated,
              .windowRuleReevaluation,
              .observedConstraintsChanged,
@@ -168,7 +166,6 @@ enum RefreshReason: String, Sendable {
              .gapsChanged,
              .workspaceTransition,
              .appActivationTransition,
-             .workspaceLayoutToggled,
              .appTerminated,
              .staleFullRescan,
              .windowRuleReevaluation,

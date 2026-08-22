@@ -38,7 +38,6 @@ final class MouseInteractionCleanupTests: NiriInteractionTestCase {
         XCTAssertTrue(beginResize(fixture.engine, window: fixture.window, in: fixture.workspace))
         let handler = fixture.controller.mouseEventHandler
         handler.state.isResizing = true
-        handler.state.resizeLayout = .niri
         handler.state.activeInteractionButton = .right
         handler.state.currentHoveredEdges = .right
         let resize = try XCTUnwrap(fixture.engine.interactiveResize)
@@ -58,7 +57,6 @@ final class MouseInteractionCleanupTests: NiriInteractionTestCase {
 
         XCTAssertNil(fixture.engine.interactiveResize)
         XCTAssertFalse(handler.state.isResizing)
-        XCTAssertNil(handler.state.resizeLayout)
         XCTAssertNil(handler.state.activeInteractionButton)
         XCTAssertTrue(handler.state.currentHoveredEdges.isEmpty)
         XCTAssertFalse(handler.isInteractiveGestureActive)
@@ -71,7 +69,6 @@ final class MouseInteractionCleanupTests: NiriInteractionTestCase {
         XCTAssertTrue(beginResize(fixture.engine, window: fixture.window, in: fixture.workspace))
         let handler = fixture.controller.mouseEventHandler
         handler.state.isResizing = true
-        handler.state.resizeLayout = .niri
         handler.state.activeInteractionButton = .right
         fixture.controller.layoutRefreshController.resetState()
 

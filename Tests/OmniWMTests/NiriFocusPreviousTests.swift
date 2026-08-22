@@ -188,13 +188,6 @@ final class NiriFocusPreviousTests: XCTestCase {
         let workspaceB = try XCTUnwrap(
             controller.workspaceManager.workspaceId(for: "2", createIfMissing: true)
         )
-        controller.settings.workspaceConfigurations = controller.settings.workspaceConfigurations.map { configuration in
-            guard configuration.name == "1" else { return configuration }
-            var configuration = configuration
-            configuration.layoutType = .dwindle
-            return configuration
-        }
-        controller.workspaceManager.applySettings()
         _ = controller.workspaceManager.focusWorkspace(named: "2")
         controller.niriLayoutHandler.enableNiriLayout()
         let engine = try XCTUnwrap(controller.niriEngine)

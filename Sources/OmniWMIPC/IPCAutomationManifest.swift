@@ -6,7 +6,6 @@ import Foundation
 public enum IPCAutomationLayoutCompatibility: String, Codable, CaseIterable, Equatable, Sendable {
     case shared
     case niri
-    case dwindle
 }
 
 public enum IPCQuerySelectorName: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
@@ -48,9 +47,6 @@ public enum IPCCommandArgumentKind: String, Codable, CaseIterable, Equatable, Se
     case workspaceNumber = "workspace-number"
     case columnIndex = "column-index"
     case windowIndex = "window-index"
-    case layout
-    case resizeAxis = "resize-axis"
-    case resizeOperation = "resize-operation"
     case sizeChange = "size-change"
 
     public var usagePlaceholder: String {
@@ -61,12 +57,6 @@ public enum IPCCommandArgumentKind: String, Codable, CaseIterable, Equatable, Se
              .columnIndex,
              .windowIndex:
             "<number>"
-        case .layout:
-            "<default|niri|dwindle>"
-        case .resizeAxis:
-            "<horizontal|vertical>"
-        case .resizeOperation:
-            "<grow|shrink>"
         case .sizeChange:
             "<size-change>"
         }
@@ -266,18 +256,6 @@ public enum IPCAutomationManifest {
         kind: .windowIndex,
         summary: "One-based window index within the focused column."
     )
-    private static let layoutArgument = IPCCommandArgumentDescriptor(
-        kind: .layout,
-        summary: "Workspace layout selection."
-    )
-    private static let resizeAxisArgument = IPCCommandArgumentDescriptor(
-        kind: .resizeAxis,
-        summary: "Dwindle split axis."
-    )
-    private static let resizeOperationArgument = IPCCommandArgumentDescriptor(
-        kind: .resizeOperation,
-        summary: "Whether to grow or shrink."
-    )
     private static let sizeChangeArgument = IPCCommandArgumentDescriptor(
         kind: .sizeChange,
         summary: "Size change such as 100, 50%, +10, or -10%."
@@ -438,7 +416,7 @@ public enum IPCAutomationManifest {
         command(
             ["focus"],
             name: .focus,
-            summary: "Focus spatially; Dwindle Up/Down traverse grouped tabs before edge fallback.",
+            summary: "Focus spatially; Up/Down traverse grouped tabs before edge fallback.",
             arguments: [directionArgument]
         ),
         command(
@@ -481,12 +459,12 @@ public enum IPCAutomationManifest {
         command(
             ["focus-window", "down-or-top"],
             name: .focusWindowDownOrTop,
-            summary: "Focus the next window in the active Niri column or Dwindle group, wrapping to the top."
+            summary: "Focus the next window in the active Niri column, wrapping to the top."
         ),
         command(
             ["focus-window", "up-or-bottom"],
             name: .focusWindowUpOrBottom,
-            summary: "Focus the previous window in the active Niri column or Dwindle group, wrapping to the bottom."
+            summary: "Focus the previous window in the active Niri column, wrapping to the bottom."
         ),
         command(
             ["focus-window-or-workspace-down"],
@@ -534,18 +512,18 @@ public enum IPCAutomationManifest {
         command(
             ["move"],
             name: .move,
-            summary: "Move with layout-aware consume/expel or Dwindle join/extract behavior.",
+            summary: "Move with layout-aware consume/expel behavior.",
             arguments: [directionArgument]
         ),
         command(
             ["move-window-down"],
             name: .moveWindowDown,
-            summary: "Reorder the focused window down by one without wrapping within its Niri column or Dwindle group."
+            summary: "Reorder the focused window down by one without wrapping within its Niri column."
         ),
         command(
             ["move-window-up"],
             name: .moveWindowUp,
-            summary: "Reorder the focused window up by one without wrapping within its Niri column or Dwindle group."
+            summary: "Reorder the focused window up by one without wrapping within its Niri column."
         ),
         command(
             ["move-window-down-or-to-workspace-down"],
@@ -656,7 +634,7 @@ public enum IPCAutomationManifest {
         command(
             ["move-column"],
             name: .moveColumn,
-            summary: "Move a Niri column horizontally or a complete Dwindle tile/group without monitor fallback.",
+            summary: "Move a Niri column horizontally without monitor fallback.",
             arguments: [directionArgument]
         ),
         command(
@@ -783,51 +761,6 @@ public enum IPCAutomationManifest {
             arguments: [directionArgument]
         ),
         command(["balance-sizes"], name: .balanceSizes, summary: "Balance layout sizes in the active workspace."),
-        command(
-            ["move-to-root"],
-            name: .moveToRoot,
-            summary: "Move the selected Dwindle window to the root split.",
-            layoutCompatibility: .dwindle
-        ),
-        command(
-            ["toggle-split"],
-            name: .toggleSplit,
-            summary: "Toggle the active Dwindle split orientation.",
-            layoutCompatibility: .dwindle
-        ),
-        command(
-            ["swap-split"],
-            name: .swapSplit,
-            summary: "Swap the active Dwindle split.",
-            layoutCompatibility: .dwindle
-        ),
-        command(
-            ["resize"],
-            name: .resize,
-            summary: "Resize the selected Dwindle window.",
-            arguments: [resizeAxisArgument, resizeOperationArgument],
-            layoutCompatibility: .dwindle
-        ),
-        command(
-            ["resize-focused"],
-            name: .resizeFocused,
-            summary: "Grow or shrink the focused Dwindle window.",
-            arguments: [resizeOperationArgument],
-            layoutCompatibility: .dwindle
-        ),
-        command(
-            ["preselect"],
-            name: .preselect,
-            summary: "Set the Dwindle preselection direction.",
-            arguments: [directionArgument],
-            layoutCompatibility: .dwindle
-        ),
-        command(
-            ["preselect", "clear"],
-            name: .preselectClear,
-            summary: "Clear the Dwindle preselection.",
-            layoutCompatibility: .dwindle
-        ),
         command(["open-command-palette"], name: .openCommandPalette, summary: "Toggle the command palette."),
         command(
             ["raise-all-floating-windows"],
@@ -851,17 +784,6 @@ public enum IPCAutomationManifest {
             summary: "Toggle runtime workspace bar visibility."
         ),
         command(["hidden-bar", "panel"], name: .hiddenBarPanel, summary: "Toggle the hidden-bar items panel."),
-        command(
-            ["toggle-workspace-layout"],
-            name: .toggleWorkspaceLayout,
-            summary: "Toggle the current workspace between Niri and Dwindle."
-        ),
-        command(
-            ["set-workspace-layout"],
-            name: .setWorkspaceLayout,
-            summary: "Set the current workspace layout explicitly.",
-            arguments: [layoutArgument]
-        ),
         command(["toggle-fullscreen"], name: .toggleFullscreen, summary: "Toggle OmniWM-managed fullscreen."),
         command(
             ["toggle-native-fullscreen"],

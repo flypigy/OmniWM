@@ -72,16 +72,8 @@ final class WorkspaceManager {
             monitors = [Monitor.fallback()]
         }
         rebuildMonitorIndexes()
-        world.installActiveLayoutResolver { [unowned self] workspaceId in
-            self.activeLayoutKind(for: workspaceId)
-        }
         applySettings()
         reconcileInteractionMonitorState(notify: false)
-    }
-
-    func activeLayoutKind(for workspaceId: WorkspaceDescriptor.ID) -> ActiveLayoutKind {
-        guard let descriptor = workspacesById[workspaceId] else { return .niri }
-        return settings.layoutType(for: descriptor.name) == .dwindle ? .dwindle : .niri
     }
 
     func reconcileSnapshot() -> ReconcileSnapshot {
@@ -111,7 +103,7 @@ final class WorkspaceManager {
         var layouts: [WorkspaceDescriptor.ID: LayoutTopology] = [:]
         for workspaceId in Set(windowSnapshots.map(\.workspaceId)) {
             let topology = world.layoutTopology(for: workspaceId)
-            if topology.hasColumns || !topology.dwindleFullscreenTokens.isEmpty {
+            if topology.hasColumns {
                 layouts[workspaceId] = topology
             }
         }
@@ -2884,11 +2876,6 @@ final class WorkspaceManager {
         return captured
     }
 
-    var dwindleEngine: DwindleLayoutEngine? {
-        get { world.dwindleEngine }
-        set { world.installDwindleEngine(newValue) }
-    }
-
     func layoutTopology(for workspaceId: WorkspaceDescriptor.ID) -> LayoutTopology {
         world.layoutTopology(for: workspaceId)
     }
@@ -3243,7 +3230,6 @@ final class WorkspaceManager {
         withEngineMutationScope(label: "workspace_removed_engine_cleanup", source: .workspaceManager) {
             for id in toRemove {
                 niriEngine?.removeWorkspaceState(id)
-                dwindleEngine?.removeLayout(for: id)
             }
         }
         world.removeInvalidationMarks(for: ids)

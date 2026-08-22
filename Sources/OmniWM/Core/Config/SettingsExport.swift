@@ -87,14 +87,6 @@ struct SettingsExport: Equatable {
     var monitorOrientationSettings: [MonitorOrientationSettings]
     var monitorNiriSettings: [MonitorNiriSettings]
 
-    var dwindleSmartSplit: Bool
-    var dwindleDefaultSplitRatio: Double
-    var dwindleSplitWidthMultiplier: Double
-    var dwindleSingleWindowFit: String
-    var dwindleUseGlobalGaps: Bool
-    var dwindleMoveToRootStable: Bool
-    var monitorDwindleSettings: [MonitorDwindleSettings]
-
     var monitorGapSettings: [MonitorGapSettings]
 
     var preventSleepEnabled: Bool
@@ -197,13 +189,6 @@ extension SettingsExport {
             appRules: BuiltInSettingsDefaults.appRules,
             monitorOrientationSettings: [],
             monitorNiriSettings: [],
-            dwindleSmartSplit: false,
-            dwindleDefaultSplitRatio: 1.0,
-            dwindleSplitWidthMultiplier: 1.0,
-            dwindleSingleWindowFit: SingleWindowFit.fullScreen.serialized,
-            dwindleUseGlobalGaps: true,
-            dwindleMoveToRootStable: true,
-            monitorDwindleSettings: [],
             monitorGapSettings: [],
             preventSleepEnabled: false,
             updateChecksEnabled: true,

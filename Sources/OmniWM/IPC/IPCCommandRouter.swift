@@ -163,35 +163,12 @@ final class IPCCommandRouter {
             return swapWorkspaceWithMonitor(direction: direction(for: ipcDirection))
         case .balanceSizes:
             return controller.commandHandler.performCommand(.balanceSizes)
-        case .moveToRoot:
-            return controller.commandHandler.performCommand(.moveToRoot)
-        case .toggleSplit:
-            return controller.commandHandler.performCommand(.toggleSplit)
-        case .swapSplit:
-            return controller.commandHandler.performCommand(.swapSplit)
-        case let .resize(axis, operation):
-            return controller.commandHandler.performCommand(
-                .resizeAlongAxis(dwindleOrientation(for: axis), operation == .grow)
-            )
-        case let .resizeFocused(operation):
-            return controller.commandHandler.performCommand(.resizeFocusedWindow(operation == .grow))
-        case let .preselect(ipcDirection):
-            return controller.commandHandler.performCommand(.preselect(direction(for: ipcDirection)))
-        case .preselectClear:
-            return controller.commandHandler.performCommand(.preselectClear)
         case .openCommandPalette:
             return controller.commandHandler.performCommand(.openCommandPalette)
         case .raiseAllFloatingWindows:
             return raiseAllFloatingWindows()
         case .rescueOffscreenWindows:
             return rescueOffscreenWindows()
-        case .toggleWorkspaceLayout:
-            return controller.commandHandler.performCommand(.toggleWorkspaceLayout)
-        case let .setWorkspaceLayout(layout):
-            if let guardResult = validateControllerState() {
-                return guardResult
-            }
-            return controller.commandHandler.setWorkspaceLayout(layoutType(for: layout)) ? .executed : .notFound
         case .toggleFullscreen:
             return controller.commandHandler.performCommand(.toggleFullscreen)
         case .toggleNativeFullscreen:
@@ -332,15 +309,6 @@ final class IPCCommandRouter {
         }
     }
 
-    private func dwindleOrientation(for axis: IPCResizeAxis) -> DwindleOrientation {
-        switch axis {
-        case .horizontal:
-            .horizontal
-        case .vertical:
-            .vertical
-        }
-    }
-
     private func sizeChange(for change: IPCSizeChange) -> NiriSizeChange {
         switch change.kind {
         case .setFixed:
@@ -381,17 +349,6 @@ final class IPCCommandRouter {
         let currentMonitorId = controller.workspaceManager.interactionMonitorId ?? controller.monitorForInteraction()?
             .id
         return currentMonitorId == previousMonitorId ? .notFound : .executed
-    }
-
-    private func layoutType(for value: IPCWorkspaceLayout) -> LayoutType {
-        switch value {
-        case .defaultLayout:
-            .defaultLayout
-        case .niri:
-            .niri
-        case .dwindle:
-            .dwindle
-        }
     }
 
     private func switchWorkspace(using command: HotkeyCommand) -> ExternalCommandResult {

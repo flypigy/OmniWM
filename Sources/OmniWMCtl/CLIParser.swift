@@ -633,13 +633,6 @@ enum CLIParser {
         return direction
     }
 
-    private static func parseResizeAxis(_ rawValue: String) throws -> IPCResizeAxis {
-        guard let axis = IPCResizeAxis(rawValue: rawValue) else {
-            throw CLIParseError.usage(usageText)
-        }
-        return axis
-    }
-
     private static func parseWorkspaceNumber(_ rawValue: String) throws -> Int {
         guard let workspaceNumber = Int(rawValue), workspaceNumber > 0 else {
             throw CLIParseError.usage(usageText)
@@ -689,20 +682,6 @@ enum CLIParser {
         return windowIndex
     }
 
-    private static func parseResizeOperation(_ rawValue: String) throws -> IPCResizeOperation {
-        guard let operation = IPCResizeOperation(rawValue: rawValue) else {
-            throw CLIParseError.usage(usageText)
-        }
-        return operation
-    }
-
-    private static func parseWorkspaceLayout(_ rawValue: String) throws -> IPCWorkspaceLayout {
-        guard let layout = IPCWorkspaceLayout(rawValue: rawValue) else {
-            throw CLIParseError.usage(usageText)
-        }
-        return layout
-    }
-
     private static func parseSizeChange(_ rawValue: String) throws -> IPCSizeChange {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -735,12 +714,6 @@ enum CLIParser {
             return .integer(try parseColumnIndex(token))
         case .windowIndex:
             return .integer(try parseWindowIndex(token))
-        case .layout:
-            return .layout(try parseWorkspaceLayout(token))
-        case .resizeAxis:
-            return .resizeAxis(try parseResizeAxis(token))
-        case .resizeOperation:
-            return .resizeOperation(try parseResizeOperation(token))
         case .sizeChange:
             return .sizeChange(try parseSizeChange(token))
         }

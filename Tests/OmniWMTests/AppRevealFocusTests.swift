@@ -420,9 +420,6 @@ final class AppRevealFocusTests: XCTestCase {
 
     private func makeFixture(pid: pid_t, windowId: Int) throws -> Fixture {
         let settings = makeSettingsStore()
-        settings.workspaceConfigurations = settings.workspaceConfigurations.map {
-            $0.name == "1" ? $0.with(layoutType: .dwindle) : $0
-        }
         let controller = WMController(
             settings: settings,
             windowFocusOperations: WindowFocusOperations(

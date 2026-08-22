@@ -399,14 +399,6 @@ final class MonitorSettingsIdentityTests: XCTestCase {
                 visibleContainerCount: 2
             )
         ]
-        export.monitorDwindleSettings = [
-            MonitorDwindleSettings(
-                monitorName: "Display",
-                monitorDisplayUUID: displayUUIDA,
-                monitorDisplayId: 7,
-                smartSplit: true
-            )
-        ]
         export.monitorGapSettings = [
             MonitorGapSettings(
                 monitorName: "Display",
@@ -420,19 +412,17 @@ final class MonitorSettingsIdentityTests: XCTestCase {
         let toml = String(decoding: data, as: UTF8.self)
         let decoded = try SettingsTOMLCodec.decode(data)
 
-        XCTAssertEqual(toml.components(separatedBy: "monitorDisplayUUID =").count - 1, 6)
+        XCTAssertEqual(toml.components(separatedBy: "monitorDisplayUUID =").count - 1, 5)
         XCTAssertFalse(toml.contains("monitorDisplayId ="))
         XCTAssertEqual(decoded.monitorRoutingSettings.first?.monitorDisplayUUID, displayUUIDA)
         XCTAssertEqual(decoded.monitorBarSettings.first?.monitorDisplayUUID, displayUUIDA)
         XCTAssertEqual(decoded.monitorOrientationSettings.first?.monitorDisplayUUID, displayUUIDA)
         XCTAssertEqual(decoded.monitorNiriSettings.first?.monitorDisplayUUID, displayUUIDA)
-        XCTAssertEqual(decoded.monitorDwindleSettings.first?.monitorDisplayUUID, displayUUIDA)
         XCTAssertEqual(decoded.monitorGapSettings.first?.monitorDisplayUUID, displayUUIDA)
         XCTAssertNil(decoded.monitorRoutingSettings.first?.monitorDisplayId)
         XCTAssertNil(decoded.monitorBarSettings.first?.monitorDisplayId)
         XCTAssertNil(decoded.monitorOrientationSettings.first?.monitorDisplayId)
         XCTAssertNil(decoded.monitorNiriSettings.first?.monitorDisplayId)
-        XCTAssertNil(decoded.monitorDwindleSettings.first?.monitorDisplayId)
         XCTAssertNil(decoded.monitorGapSettings.first?.monitorDisplayId)
     }
 
@@ -478,15 +468,6 @@ final class MonitorSettingsIdentityTests: XCTestCase {
             ),
             for: monitor
         )
-        settings.updateDwindleSettings(
-            MonitorDwindleSettings(
-                monitorName: "Wrong",
-                monitorDisplayUUID: displayUUIDB,
-                monitorDisplayId: 7,
-                smartSplit: true
-            ),
-            for: monitor
-        )
         settings.updateGapSettings(
             MonitorGapSettings(
                 monitorName: "Wrong",
@@ -501,7 +482,6 @@ final class MonitorSettingsIdentityTests: XCTestCase {
         assertIdentity(try XCTUnwrap(settings.monitorBarSettings.first), monitor: monitor)
         assertIdentity(try XCTUnwrap(settings.monitorOrientationSettings.first), monitor: monitor)
         assertIdentity(try XCTUnwrap(settings.monitorNiriSettings.first), monitor: monitor)
-        assertIdentity(try XCTUnwrap(settings.monitorDwindleSettings.first), monitor: monitor)
         assertIdentity(try XCTUnwrap(settings.monitorGapSettings.first), monitor: monitor)
     }
 
@@ -519,9 +499,6 @@ final class MonitorSettingsIdentityTests: XCTestCase {
         export.monitorNiriSettings = [
             MonitorNiriSettings(monitorName: "Display", monitorDisplayId: 7, visibleContainerCount: 2)
         ]
-        export.monitorDwindleSettings = [
-            MonitorDwindleSettings(monitorName: "Display", monitorDisplayId: 7, smartSplit: true)
-        ]
         export.monitorGapSettings = [
             MonitorGapSettings(monitorName: "Display", monitorDisplayId: 7, innerGap: 6)
         ]
@@ -530,13 +507,12 @@ final class MonitorSettingsIdentityTests: XCTestCase {
         let toml = String(decoding: data, as: UTF8.self)
         let decoded = try SettingsTOMLCodec.decode(data)
 
-        XCTAssertEqual(toml.components(separatedBy: "monitorDisplayId =").count - 1, 6)
+        XCTAssertEqual(toml.components(separatedBy: "monitorDisplayId =").count - 1, 5)
         XCTAssertFalse(toml.contains("monitorDisplayUUID ="))
         XCTAssertEqual(decoded.monitorRoutingSettings.first?.monitorDisplayId, 7)
         XCTAssertEqual(decoded.monitorBarSettings.first?.monitorDisplayId, 7)
         XCTAssertEqual(decoded.monitorOrientationSettings.first?.monitorDisplayId, 7)
         XCTAssertEqual(decoded.monitorNiriSettings.first?.monitorDisplayId, 7)
-        XCTAssertEqual(decoded.monitorDwindleSettings.first?.monitorDisplayId, 7)
         XCTAssertEqual(decoded.monitorGapSettings.first?.monitorDisplayId, 7)
     }
 
