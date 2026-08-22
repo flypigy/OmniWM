@@ -32,11 +32,6 @@ final class LayoutDiffFrameOnlyTests: XCTestCase {
         ]
         XCTAssertFalse(LayoutDiffExecutor.isFrameOnly(diff))
         diff.restoreChanges = []
-
-        diff.deferredHides = [
-            LayoutDeferredHide(token: token, side: .left, revealToken: token)
-        ]
-        XCTAssertFalse(LayoutDiffExecutor.isFrameOnly(diff))
     }
 
     @MainActor

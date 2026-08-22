@@ -2465,7 +2465,6 @@ final class RuntimeArchitectureTests: XCTestCase {
             reason: .windowDestroyed,
             windowRemovalPayload: .init(
                 workspaceId: workspaceId,
-                layoutType: .niri,
                 removedNodeId: nil,
                 removedNiriColumn: false,
                 niriOldFrames: [:],

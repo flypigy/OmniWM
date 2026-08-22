@@ -393,7 +393,6 @@ final class RescanScopeTests: XCTestCase {
             reason: .windowDestroyed,
             windowRemovalPayload: .init(
                 workspaceId: workspaceId,
-                layoutType: .niri,
                 removedNodeId: nil,
                 removedNiriColumn: false,
                 niriOldFrames: [:],
@@ -645,8 +644,7 @@ final class RescanScopeTests: XCTestCase {
                 reason: .windowDestroyed,
                 windowRemovalPayload: .init(
                     workspaceId: workspaceId,
-                    layoutType: .niri,
-                    removedNodeId: nil,
+                        removedNodeId: nil,
                     removedNiriColumn: false,
                     niriOldFrames: [:],
                     shouldRecoverFocus: false,
@@ -713,8 +711,7 @@ final class RescanScopeTests: XCTestCase {
                 reason: .windowDestroyed,
                 windowRemovalPayload: .init(
                     workspaceId: newerWorkspaceId,
-                    layoutType: .niri,
-                    removedNodeId: nil,
+                        removedNodeId: nil,
                     removedNiriColumn: false,
                     niriOldFrames: [:],
                     shouldRecoverFocus: false,
@@ -1258,7 +1255,6 @@ final class RescanScopeTests: XCTestCase {
         let workspaceId = try XCTUnwrap(
             WindowAdmissionTestSupport.workspace(
                 named: "1",
-                layoutType: .niri,
                 controller: controller
             )
         )
@@ -1399,7 +1395,6 @@ final class RescanScopeTests: XCTestCase {
             reason: .windowDestroyed,
             windowRemovalPayload: .init(
                 workspaceId: workspaceId,
-                layoutType: .niri,
                 removedNodeId: nil,
                 removedNiriColumn: false,
                 niriOldFrames: [:],
