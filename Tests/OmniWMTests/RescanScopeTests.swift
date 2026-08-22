@@ -1255,6 +1255,7 @@ final class RescanScopeTests: XCTestCase {
         let workspaceId = try XCTUnwrap(
             WindowAdmissionTestSupport.workspace(
                 named: "1",
+                layoutType: .niri,
                 controller: controller
             )
         )
