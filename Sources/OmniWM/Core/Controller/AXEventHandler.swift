@@ -960,8 +960,8 @@ final class AXEventHandler {
         WindowAdmissionTrace.record(
             .init(
                 action: .admissionRetryScheduled,
-                windowId: Int(windowId),
                 pid: pid_t(info.pid),
+                windowId: Int(windowId),
                 reason: "wine_sweep_attempt_\(attempt.count)",
                 outcome: "scheduled"
             )
