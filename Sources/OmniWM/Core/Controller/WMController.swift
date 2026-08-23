@@ -130,6 +130,8 @@ final class WMController {
     @ObservationIgnored
     private var runtimeFrameJobCancellationSuppressionDepth: Int = 0
     @ObservationIgnored
+    private var wineAdmissionSweepTask: Task<Void, Never>?
+    @ObservationIgnored
     private var floatDemotionFirstSamplesByToken: [WindowToken: ContinuousClock.Instant] = [:]
     private static let floatDemotionStabilityInterval: Duration = .milliseconds(300)
     private static let finderBundleId = "com.apple.finder"
@@ -869,7 +871,9 @@ final class WMController {
               let column = engine.findColumn(containing: windowNode, in: workspaceId),
               let monitor = workspaceManager.monitor(for: workspaceId)
         else { return }
-        guard let bundleId = workspaceManager.entry(for: token)?.managedReplacementMetadata?.bundleId,
+        guard let entry = workspaceManager.entry(for: token),
+              let bundleId = entry.managedReplacementMetadata?.bundleId
+                  ?? appInfoCache.info(for: entry.pid)?.bundleId,
               !bundleId.isEmpty
         else { return }
 
@@ -892,7 +896,36 @@ final class WMController {
             rules.append(AppRule(bundleId: bundleId, initialContainerPrimarySpan: clamped))
         }
         settings.appRules = rules
-        updateAppRules()
+        // Width memory only seeds future admissions; rescanning existing
+        // windows here would fight the layout the user just finished adjusting.
+        rebuildAppRulesCache()
+    }
+
+    /// Wine game surfaces often appear in the WindowServer minutes before their
+    /// process can answer AX queries, so live create-admission (and its retry
+    /// window) expires before facts are fetchable. This sweep re-kicks
+    /// admission for visible, untracked, base-level parentless windows so such
+    /// windows eventually join the tiling strip instead of lingering below it.
+    func startWineAdmissionSweep() {
+        guard wineAdmissionSweepTask == nil else { return }
+        wineAdmissionSweepTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
+                for info in SkyLight.shared.queryAllVisibleWindows()
+                where info.level == 0
+                    && info.parentId == 0
+                    && info.frame.width >= 480
+                    && info.frame.height >= 300
+                    && self.workspaceManager.entry(forWindowId: Int(info.id)) == nil
+                {
+                    self.axEventHandler.retryUntrackedWineWindowAdmission(
+                        windowId: info.id,
+                        serverInfo: info
+                    )
+                }
+            }
+        }
     }
 
     func innerGap(for monitor: Monitor) -> CGFloat {

@@ -426,8 +426,10 @@ final class WindowRuleEngine {
     }
 
     nonisolated static func isWineStyleWindow(_ facts: WindowRuleFacts) -> Bool {
-        guard facts.ax.attributeFetchSucceeded,
-              facts.ax.role == (kAXWindowRole as String),
+        // Degraded fact fetches (attributeFetchSucceeded == false) still carry
+        // role/subrole/button evidence for Wine-bridged windows, so the wine
+        // signature below is trusted as-is instead of requiring a clean fetch.
+        guard facts.ax.role == (kAXWindowRole as String),
               facts.ax.subrole == (kAXUnknownSubrole as String),
               !facts.ax.hasCloseButton,
               !facts.ax.hasFullscreenButton,

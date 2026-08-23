@@ -1829,6 +1829,50 @@ enum StructuralMutationOutcome: Equatable {
         }
     }
 
+    /// Adopts an externally observed frame width (native edge-drag on a tiled
+    /// window) into its column as a manual width override, instead of letting
+    /// the reconcile pass snap the window back. PaperWM-style resize semantics.
+    /// Returns false when the frame does not look like a primary-axis manual
+    /// resize of the focused window, leaving standard relayout handling intact.
+    func adoptNativeColumnWidthIfPlausible(token: WindowToken, observedWidth: CGFloat) -> Bool {
+        guard let controller, controller.workspaceManager.focusedToken == token else { return false }
+        var adoptedWorkspaceId: WorkspaceDescriptor.ID?
+        withNiriWorkspaceContext { engine, wsId, _, _, _, workingFrame, gaps, orientation in
+            guard orientation == .horizontal,
+                  let windowNode = engine.findNode(for: token, in: wsId) as? NiriWindow,
+                  let column = engine.findColumn(containing: windowNode, in: wsId)
+            else { return }
+
+            let currentWidth = engine.cachedWidthForResizeStart(
+                column,
+                in: wsId,
+                workingFrame: workingFrame,
+                gaps: gaps
+            )
+            guard abs(observedWidth - currentWidth) > 8 else { return }
+
+            let widthBounds = engine.projectedWidthBounds(for: column, workspaceId: wsId)
+            let maxWidth = max(widthBounds.min, widthBounds.max ?? workingFrame.width)
+            let newWidth = observedWidth.clamped(to: widthBounds.min ... max(widthBounds.min, maxWidth))
+
+            column.widthAnimation = nil
+            column.targetWidth = nil
+            column.cachedWidth = newWidth
+            column.width = .fixed(newWidth)
+            column.presetWidthIdx = nil
+            column.isFullWidth = false
+            column.savedWidth = nil
+            column.hasManualSingleWindowWidthOverride = true
+
+            recordLayoutOperation(.interactiveResizeEnded(token: token), in: wsId, source: .mouse)
+            adoptedWorkspaceId = wsId
+        }
+        guard let wsId = adoptedWorkspaceId else { return false }
+        controller.rememberNiriColumnWidth(for: token, in: wsId)
+        requestLayoutCommandRelayout(in: wsId)
+        return true
+    }
+
     func setWindowPrimarySpan(_ change: NiriSizeChange) {
         withNiriWorkspaceContext { engine, wsId, motion, state, _, workingFrame, gaps, orientation in
             guard let currentId = state.selectedNodeId,

@@ -16,7 +16,8 @@ struct WineWindowAdaptationTests {
         hasZoomButton: Bool = false,
         hasMinimizeButton: Bool = false,
         windowServerLevel: Int32? = 0,
-        parentWindowId: UInt32 = 0
+        parentWindowId: UInt32 = 0,
+        attributeFetchSucceeded: Bool = true
     ) -> WindowRuleFacts {
         WindowRuleFacts(
             appName: "Beacon Pines",
@@ -31,7 +32,7 @@ struct WineWindowAdaptationTests {
                 hasMinimizeButton: hasMinimizeButton,
                 appPolicy: .regular,
                 bundleId: "org.wine.beacon-pines",
-                attributeFetchSucceeded: true
+                attributeFetchSucceeded: attributeFetchSucceeded
             ),
             sizeConstraints: nil,
             windowServer: windowServerLevel.map {
@@ -98,5 +99,19 @@ struct WineWindowAdaptationTests {
     @Test("missing WindowServer evidence is not wine-style")
     func rejectsMissingEvidence() {
         #expect(!WindowRuleEngine.isWineStyleWindow(makeFacts(windowServerLevel: nil)))
+    }
+
+    @Test("degraded attribute fetch with full wine signature still admits")
+    func admitsUnderDegradedAttributeFetch() {
+        #expect(WindowRuleEngine.isWineStyleWindow(makeFacts(attributeFetchSucceeded: false)))
+        let engine = WindowRuleEngine()
+        engine.wineWindowAdaptationEnabled = true
+        let decision = engine.decision(
+            for: makeFacts(attributeFetchSucceeded: false),
+            token: nil,
+            appFullscreen: false
+        )
+        #expect(decision.disposition == .managed)
+        #expect(decision.admissionHints.wineStyleAdaptation == true)
     }
 }

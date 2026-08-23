@@ -214,6 +214,7 @@ final class ServiceLifecycleManager {
             liveApplicationPIDs: Set(runningApplications.lazy.map(\.processIdentifier))
         )
         controller.axEventHandler.setup()
+        controller.startWineAdmissionSweep()
         for app in runningApplications {
             controller.refreshUnavailableWorkspaceBarIconOverride(
                 bundleId: app.bundleIdentifier

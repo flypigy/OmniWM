@@ -671,7 +671,12 @@ enum AXWindowService {
               let values,
               CFArrayGetCount(values) > WindowTypeAttributeIndex.minimizeButton.rawValue
         else {
-            return AXWindowDecisionEvidence.unavailable(
+            return collectWindowFactsViaIndividualAttributes(
+                window,
+                appPolicy: appPolicy,
+                bundleId: bundleId,
+                includeTitle: includeTitle
+            ) ?? AXWindowDecisionEvidence.unavailable(
                 appPolicy: appPolicy,
                 bundleId: bundleId
             ).facts
@@ -718,6 +723,65 @@ enum AXWindowService {
             appPolicy: appPolicy,
             bundleId: bundleId,
             attributeFetchSucceeded: attributeFetchSucceeded
+        )
+    }
+
+    /// Fallback for windows whose AX implementation rejects the batched
+    /// multi-attribute copy outright (common for Wine-bridged apps) while still
+    /// answering single-attribute queries. Returns nil when even role/subrole
+    /// cannot be fetched, matching the caller's degraded-evidence behavior.
+    private static func collectWindowFactsViaIndividualAttributes(
+        _ window: AXWindowRef,
+        appPolicy: NSApplication.ActivationPolicy?,
+        bundleId: String?,
+        includeTitle: Bool
+    ) -> AXWindowFacts? {
+        func attribute(_ name: CFString) -> CFTypeRef? {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(window.element, name, &value) == .success else {
+                return nil
+            }
+            return value
+        }
+
+        guard let role = attribute(kAXRoleAttribute as CFString) as? String,
+              let subrole = attribute(kAXSubroleAttribute as CFString) as? String
+        else {
+            return nil
+        }
+
+        let closeButton = attribute(kAXCloseButtonAttribute as CFString) != nil
+        let fullscreenButton = attribute(kAXFullScreenButtonAttribute as CFString)
+        let zoomButton = attribute(kAXZoomButtonAttribute as CFString) != nil
+        let minimizeButton = attribute(kAXMinimizeButtonAttribute as CFString) != nil
+
+        var fullscreenButtonEnabled: Bool?
+        if let fullscreenButton,
+           CFGetTypeID(fullscreenButton) == AXUIElementGetTypeID()
+        {
+            let buttonElement = unsafeDowncast(fullscreenButton, to: AXUIElement.self)
+            var enabledValue: CFTypeRef?
+            if AXUIElementCopyAttributeValue(
+                buttonElement,
+                kAXEnabledAttribute as CFString,
+                &enabledValue
+            ) == .success, let enabledValue {
+                fullscreenButtonEnabled = enabledValue as? Bool
+            }
+        }
+
+        return AXWindowFacts(
+            role: role,
+            subrole: subrole,
+            title: includeTitle ? attribute(kAXTitleAttribute as CFString) as? String : nil,
+            hasCloseButton: closeButton,
+            hasFullscreenButton: fullscreenButton != nil,
+            fullscreenButtonEnabled: fullscreenButtonEnabled,
+            hasZoomButton: zoomButton,
+            hasMinimizeButton: minimizeButton,
+            appPolicy: appPolicy,
+            bundleId: bundleId,
+            attributeFetchSucceeded: true
         )
     }
 
