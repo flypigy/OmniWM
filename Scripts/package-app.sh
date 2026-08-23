@@ -37,11 +37,16 @@ if command -v plutil >/dev/null 2>&1; then
   plutil -replace OMNIWMGitHash -string "$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo SNAPSHOT)" "$APP_DIR/Contents/Info.plist"
 fi
 cp "$ROOT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+cp -R "$BUILD_DIR/OmniWM_OmniWM.bundle" "$APP_DIR/Contents/Resources/"
+
 # Swift 6.3's generated Bundle.module accessor resolves only
 # Bundle.main.bundleURL/<bundle>.bundle (the .app root) and the build-time
-# .build path; it never looks in Contents/Resources, so the resource bundle
-# must sit at the app bundle root or Bundle.module traps at runtime.
-cp -R "$BUILD_DIR/OmniWM_OmniWM.bundle" "$APP_DIR/"
+# .build path; it never looks in Contents/Resources. A real directory at the
+# bundle root breaks codesign ("unsealed contents"), so after signing we drop
+# a symlink there pointing at the sealed copy in Contents/Resources.
+link_resource_bundle_at_root() {
+  ln -sfn "Contents/Resources/OmniWM_OmniWM.bundle" "$APP_DIR/OmniWM_OmniWM.bundle"
+}
 
 if command -v plutil >/dev/null 2>&1; then
   plutil -lint "$APP_DIR/Contents/Info.plist" >/dev/null
@@ -67,6 +72,8 @@ if [ "$SIGN_AND_NOTARIZE" = "true" ]; then
   echo "Stapling notarization ticket..."
   xcrun stapler staple "$APP_DIR"
 
+  link_resource_bundle_at_root
+
   echo "Verifying notarization..."
   spctl --assess --verbose=2 "$APP_DIR"
 
@@ -86,6 +93,7 @@ elif [ "$SIGN_AND_NOTARIZE" = "dev" ]; then
   codesign --force --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_DIR/Contents/MacOS/OmniWM"
   codesign --force --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_DIR"
   codesign --verify --verbose "$APP_DIR"
+  link_resource_bundle_at_root
   echo "Done. Launch with 'open $APP_DIR' so LaunchServices assigns the app identity."
 else
   echo "Done. Open $APP_DIR to grant Accessibility permissions."
