@@ -37,7 +37,11 @@ if command -v plutil >/dev/null 2>&1; then
   plutil -replace OMNIWMGitHash -string "$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo SNAPSHOT)" "$APP_DIR/Contents/Info.plist"
 fi
 cp "$ROOT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
-cp -R "$BUILD_DIR/OmniWM_OmniWM.bundle" "$APP_DIR/Contents/Resources/"
+# Swift 6.3's generated Bundle.module accessor resolves only
+# Bundle.main.bundleURL/<bundle>.bundle (the .app root) and the build-time
+# .build path; it never looks in Contents/Resources, so the resource bundle
+# must sit at the app bundle root or Bundle.module traps at runtime.
+cp -R "$BUILD_DIR/OmniWM_OmniWM.bundle" "$APP_DIR/"
 
 if command -v plutil >/dev/null 2>&1; then
   plutil -lint "$APP_DIR/Contents/Info.plist" >/dev/null
