@@ -1839,7 +1839,7 @@ enum StructuralMutationOutcome: Equatable {
         var adoptedWorkspaceId: WorkspaceDescriptor.ID?
         withNiriWorkspaceContext { engine, wsId, _, _, _, workingFrame, gaps, orientation in
             guard orientation == .horizontal,
-                  let windowNode = engine.findNode(for: token, in: wsId) as? NiriWindow,
+                  let windowNode = engine.findNode(for: token, in: wsId),
                   let column = engine.findColumn(containing: windowNode, in: wsId)
             else { return }
 

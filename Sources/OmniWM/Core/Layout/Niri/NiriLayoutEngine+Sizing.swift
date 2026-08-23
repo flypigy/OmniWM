@@ -5,7 +5,7 @@ import AppKit
 import Foundation
 
 extension NiriLayoutEngine {
-    private func cachedWidthForResizeStart(
+    func cachedWidthForResizeStart(
         _ column: NiriContainer,
         in workspaceId: WorkspaceDescriptor.ID,
         workingFrame: CGRect,
