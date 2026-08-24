@@ -973,7 +973,7 @@ final class WMController {
                 let sample = actionable.prefix(3)
                     .map { "win=\($0.windowId)pid=\($0.pid)\($0.frame.width)x\($0.frame.height)" }
                     .joined(separator: " ")
-                Log.layout.notice(
+                Log.diagnostics.error(
                     "wine sweep: wine-like windows [\(sample)] -> targeted rescan pids=\(pids.sorted())"
                 )
                 self.layoutRefreshController.requestFullRescan(
@@ -1725,6 +1725,15 @@ final class WMController {
         )
         let fullscreen = appFullscreen ?? AXWindowService.isFullscreen(axRef)
         let bundleId = baseFacts.ax.bundleId ?? appInfo?.bundleId
+        // Error-level so it persists: the facts Wine-bridged windows hand to
+        // the decision pipeline have been the hardest thing to observe.
+        if bundleId == nil {
+            Log.diagnostics.error(
+                "wine-create-facts pid=\(pid) win=\(axRef.windowId) role=\(baseFacts.ax.role ?? "nil")"
+                    + " subrole=\(baseFacts.ax.subrole ?? "nil") close=\(baseFacts.ax.hasCloseButton)"
+                    + " fetchOK=\(baseFacts.ax.attributeFetchSucceeded)"
+            )
+        }
         var lookupAttempted = windowServerLookupAttempted || windowInfo != nil
         var resolvedWindowInfo = Self.exactWindowServerInfo(windowInfo, for: token)
         if resolvedWindowInfo == nil,

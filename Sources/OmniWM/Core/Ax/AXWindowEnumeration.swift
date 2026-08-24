@@ -283,6 +283,11 @@ enum AXWindowEnumerationInspector {
         let role = value(at: 0, in: resolvedValues) as? String
         let subrole = value(at: 1, in: resolvedValues) as? String
         guard AXWindowService.shouldTreatAsTopLevelWindow(role: role, subrole: subrole) else {
+            if context.bundleId == nil {
+                Log.ax.error(
+                    "wine-enum-reject win=\(windowId) role=\(role ?? "nil") subrole=\(subrole ?? "nil")"
+                )
+            }
             return nil
         }
 
@@ -399,6 +404,11 @@ enum AXWindowEnumerationInspector {
                 continue
             }
             repaired[index] = individual
+        }
+        if context.bundleId == nil {
+            Log.ax.error(
+                "wine-enum-repair role=\(value(at: 0, in: repaired) as? String ?? "nil") subrole=\(value(at: 1, in: repaired) as? String ?? "nil")"
+            )
         }
         return repaired
     }
