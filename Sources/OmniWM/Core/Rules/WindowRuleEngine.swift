@@ -532,20 +532,40 @@ final class WindowRuleEngine {
             return cleanShotDecision
         }
 
-        if wineWindowAdaptationEnabled, Self.isWineStyleWindow(facts) {
-            return WindowDecision(
-                disposition: .managed,
-                source: .builtInRule(Self.wineAdaptationRuleName),
-                layoutDecisionKind: .explicitLayout,
-                workspaceName: workspaceName,
-                ruleEffects: effects,
-                admissionHints: ManagedWindowAdmissionHints(
-                    initialNiriContainerPrimarySpan: admissionHints.initialNiriContainerPrimarySpan,
-                    wineStyleAdaptation: true
-                ),
-                heuristicReasons: [],
-                deferredReason: nil
-            )
+        if wineWindowAdaptationEnabled {
+            if Self.isWineStyleWindow(facts) {
+                return WindowDecision(
+                    disposition: .managed,
+                    source: .builtInRule(Self.wineAdaptationRuleName),
+                    layoutDecisionKind: .explicitLayout,
+                    workspaceName: workspaceName,
+                    ruleEffects: effects,
+                    admissionHints: ManagedWindowAdmissionHints(
+                        initialNiriContainerPrimarySpan: admissionHints.initialNiriContainerPrimarySpan,
+                        wineStyleAdaptation: true
+                    ),
+                    heuristicReasons: [],
+                    deferredReason: nil
+                )
+            }
+            // Wine surfaces are invisible to SkyLight's visibility-filtered
+            // queries, so evidence can be missing even though a direct
+            // WindowServer lookup would succeed — defer instead of falling
+            // through to the floating heuristics.
+            if facts.windowServer == nil,
+               Self.isTransientWidgetAXCandidate(facts.ax)
+            {
+                return WindowDecision(
+                    disposition: .undecided,
+                    source: .builtInRule(Self.wineAdaptationRuleName),
+                    layoutDecisionKind: .fallbackLayout,
+                    workspaceName: workspaceName,
+                    ruleEffects: effects,
+                    admissionHints: admissionHints,
+                    heuristicReasons: [],
+                    deferredReason: .windowServerEvidenceMissing
+                )
+            }
         }
 
         if facts.ax.title == nil,

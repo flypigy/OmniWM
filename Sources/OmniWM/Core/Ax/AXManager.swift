@@ -1638,6 +1638,27 @@ final class AXManager {
             let pid = pid_t(pidNumber)
             evidence.pidsWithWindows.insert(pid)
             evidence.ownerPIDByWindowId[windowNumber] = evidence.ownerPIDByWindowId[windowNumber] ?? pid
+            // SkyLight's visibility-filtered query misses Wine-bridged
+            // surfaces; synthesize their WindowServer facts from CGWindowList
+            // so rescan decisions see level/frame evidence for them.
+            if evidence.windowServerInfoByWindowId[windowNumber] == nil,
+               let bounds = window[kCGWindowBounds as String] as? [String: Any],
+               let width = (bounds["Width"] as? NSNumber)?.doubleValue,
+               let height = (bounds["Height"] as? NSNumber)?.doubleValue
+            {
+                evidence.windowServerInfoByWindowId[windowNumber] = WindowServerInfo(
+                    id: UInt32(windowNumber),
+                    pid: Int32(pidNumber),
+                    level: Int32(layer),
+                    frame: CGRect(
+                        x: (bounds["X"] as? NSNumber)?.doubleValue ?? 0,
+                        y: (bounds["Y"] as? NSNumber)?.doubleValue ?? 0,
+                        width: width,
+                        height: height
+                    ),
+                    parentId: 0
+                )
+            }
         }
         FallbackFiringRecorder.shared.note(
             .capture,

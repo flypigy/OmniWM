@@ -114,4 +114,17 @@ struct WineWindowAdaptationTests {
         #expect(decision.disposition == .managed)
         #expect(decision.admissionHints.wineStyleAdaptation == true)
     }
+
+    @Test("missing window-server evidence defers instead of falling to heuristics")
+    func defersWhenWindowServerEvidenceMissing() {
+        let engine = WindowRuleEngine()
+        engine.wineWindowAdaptationEnabled = true
+        let decision = engine.decision(
+            for: makeFacts(windowServerLevel: nil),
+            token: WindowToken(pid: 7_001, windowId: 42),
+            appFullscreen: false
+        )
+        #expect(decision.disposition == .undecided)
+        #expect(decision.deferredReason == .windowServerEvidenceMissing)
+    }
 }
