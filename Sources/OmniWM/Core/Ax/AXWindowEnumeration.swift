@@ -268,8 +268,14 @@ enum AXWindowEnumerationInspector {
             deadline: deadline,
             checkCancellation: checkCancellation
         )
-        let resolvedValues = try decisionAttributeValues(
-            element,
+        let resolvedValues = try repairDegradedDecisionAttributeValues(
+            try decisionAttributeValues(
+                element,
+                context: context,
+                deadline: deadline,
+                checkCancellation: checkCancellation
+            ),
+            on: element,
             context: context,
             deadline: deadline,
             checkCancellation: checkCancellation
@@ -343,6 +349,58 @@ enum AXWindowEnumerationInspector {
             throw AXWindowEnumerationError.invalidApplicationWindows
         }
         return values
+    }
+
+    /// Wine-bridged windows can answer the batched multi-attribute copy with
+    /// per-item error payloads: role/subrole arrive nil while the buttons
+    /// surface non-nil error values that parse as present buttons. Individual
+    /// attribute queries succeed on the same windows, so re-fetch the
+    /// classification-relevant entries one by one when the batch looks
+    /// degraded and keep whichever answer is usable.
+    private static func repairDegradedDecisionAttributeValues(
+        _ values: [Any?],
+        on element: AXUIElement,
+        context: AXWindowInspectionContext,
+        deadline: TimeInterval,
+        checkCancellation: () throws -> Void
+    ) throws -> [Any?] {
+        func buttonSlotIsDegraded(_ entry: Any?) -> Bool {
+            guard let entry else { return false } // absent is a valid answer
+            let cf = entry as CFTypeRef
+            let typeId = CFGetTypeID(cf)
+            return typeId != AXUIElementGetTypeID() && typeId != CFNullGetTypeID()
+        }
+
+        func looksDegraded() -> Bool {
+            if (value(at: 0, in: values) as? String) == nil { return true }
+            let subrole = value(at: 1, in: values)
+            if subrole != nil && !(subrole is String) { return true }
+            if (subrole as? String) == nil { return true }
+            return [5, 6, 7, 8].contains { buttonSlotIsDegraded(value(at: $0, in: values)) }
+        }
+
+        guard looksDegraded() else { return values }
+
+        var repaired = values
+        let names = context.includeTitle
+            ? decisionAttributeNames + [kAXTitleAttribute as String]
+            : decisionAttributeNames
+        for index in [0, 1, 5, 6, 7, 8] where index < repaired.count {
+            try setRemainingTimeout(on: element, until: deadline)
+            var individual: CFTypeRef?
+            let result = AXUIElementCopyAttributeValue(
+                element,
+                names[index] as CFString,
+                &individual
+            )
+            try checkCancellation()
+            guard result == .success else {
+                repaired[index] = nil
+                continue
+            }
+            repaired[index] = individual
+        }
+        return repaired
     }
 
     private static func decisionEvidence(

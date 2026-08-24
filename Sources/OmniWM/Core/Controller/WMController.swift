@@ -1796,13 +1796,25 @@ final class WMController {
             bundleId: captured.bundleId ?? appInfo?.bundleId,
             attributeFetchSucceeded: captured.attributeFetchSucceeded
         )
+        let exactWindowServer = Self.exactWindowServerInfo(windowInfo, for: token)
+        // Error-level so it persists: the facts Wine-bridged windows hand to
+        // the decision pipeline have been the hardest thing to observe.
+        if appInfo?.bundleId == nil {
+            Log.diagnostics.error(
+                "wine-facts pid=\(token.pid) win=\(token.windowId) role=\(axFacts.role ?? "nil")"
+                    + " subrole=\(axFacts.subrole ?? "nil") close=\(axFacts.hasCloseButton)"
+                    + " fs=\(axFacts.hasFullscreenButton) zoom=\(axFacts.hasZoomButton)"
+                    + " min=\(axFacts.hasMinimizeButton) fetchOK=\(axFacts.attributeFetchSucceeded)"
+                    + " ws=\(exactWindowServer.map { "lvl=\($0.level),parent=\($0.parentId)" } ?? "nil")"
+            )
+        }
         return makeWindowDispositionEvaluation(
             token: token,
             facts: WindowRuleFacts(
                 appName: appInfo?.name,
                 ax: axFacts,
                 sizeConstraints: evidence.sizeConstraints,
-                windowServer: Self.exactWindowServerInfo(windowInfo, for: token)
+                windowServer: exactWindowServer
             ),
             appFullscreen: appFullscreen,
             applyingManualOverride: applyingManualOverride,
