@@ -16,14 +16,19 @@ echo "Running release checks..."
 make -C "$ROOT_DIR" release-check
 
 echo "Building OmniWM arm64 binary ($CONFIG)..."
-# Runner VMs can retain a stale .build from a previous repository run; the
-# incremental state then skips compiling changed files and ships a stale
-# binary under a fresh git hash. Force a clean release-triple build.
-rm -rf "$ROOT_DIR/.build/arm64-apple-macosx"
+# Runner VMs can retain .build state from a previous repository run; the
+# incremental database then skips compiling changed files and links a stale
+# binary under a fresh git hash. Wipe the entire scratch directory and
+# verify the produced binary actually contains current-source markers.
+rm -rf "$ROOT_DIR/.build"
 swift build "${SWIFT_BUILD_ARGS[@]}"
 BUILD_DIR="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
 EXECUTABLE="$BUILD_DIR/OmniWM"
 CLI_EXECUTABLE="$BUILD_DIR/omniwmctl"
+if ! grep -aq "wine-facts pid" "$EXECUTABLE"; then
+  echo "ERROR: release binary lacks current-source marker (stale build state)" >&2
+  exit 1
+fi
 
 echo "Verifying arm64 binaries..."
 lipo -info "$EXECUTABLE"
