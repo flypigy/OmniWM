@@ -969,9 +969,17 @@ final class WMController {
         guard !probedPids.isEmpty else { return false }
 
         // AX queries against busy game processes can block for their full
-        // messaging timeout — never run them on the main actor.
-        let discovered: [(pid: pid_t, windowId: UInt32)] = await Task.detached(priority: .utility) {
-            probedPids.compactMap { pid -> (pid_t, UInt32)? in
+        // messaging timeout — never run them on the main actor. Carry the
+        // resolved AX element back so create admission does not have to
+        // re-resolve it under the rescan's tight deadlines.
+        struct WineProbeHit: @unchecked Sendable {
+            let pid: pid_t
+            let windowId: UInt32
+            let element: AXUIElement
+        }
+        let discovered: [WineProbeHit] = await Task.detached(priority: .utility) {
+            var hits: [WineProbeHit] = []
+            for pid in probedPids {
                 let axApp = AXUIElementCreateApplication(pid)
                 AXUIElementSetMessagingTimeout(axApp, 2.0)
                 var windowsValue: CFTypeRef?
@@ -981,26 +989,29 @@ final class WMController {
                     &windowsValue
                 ) == .success,
                     let windows = windowsValue as? [AXUIElement]
-                else { return nil }
+                else { continue }
                 for element in windows {
                     var windowId: CGWindowID = 0
                     guard _AXUIElementGetWindow(element, &windowId) == .success else { continue }
-                    return (pid, UInt32(windowId))
+                    hits.append(WineProbeHit(pid: pid, windowId: UInt32(windowId), element: element))
+                    break
                 }
-                return nil
             }
+            return hits
         }.value
 
         var acted = false
-        for candidate in discovered {
-            guard workspaceManager.entry(forWindowId: Int(candidate.windowId)) == nil else { continue }
-            wineSweepRescanAttemptsByPid[candidate.pid, default: 0] += 1
+        for hit in discovered {
+            guard workspaceManager.entry(forWindowId: Int(hit.windowId)) == nil else { continue }
+            wineSweepRescanAttemptsByPid[hit.pid, default: 0] += 1
             pruneWineSweepAttempts()
             Log.diagnostics.error(
-                "wine sweep: untracked window win=\(candidate.windowId) pid=\(candidate.pid) -> create admission"
+                "wine sweep: untracked window win=\(hit.windowId) pid=\(hit.pid) -> create admission with axRef"
             )
             axEventHandler.processCreatedWindow(
-                windowId: candidate.windowId,
+                windowId: hit.windowId,
+                fallbackToken: WindowToken(pid: hit.pid, windowId: Int(hit.windowId)),
+                fallbackAXRef: AXWindowRef(element: hit.element, windowId: Int(hit.windowId)),
                 placementOrigin: .liveCreate,
                 retryTrigger: .create
             )
