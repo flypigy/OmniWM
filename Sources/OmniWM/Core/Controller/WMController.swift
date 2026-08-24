@@ -905,50 +905,114 @@ final class WMController {
 
     /// Wine game surfaces often appear in the WindowServer minutes before their
     /// process can answer AX queries, so live create-admission (and its retry
-    /// window) expires before facts are fetchable; and CGWindowList needs
-    /// Screen Recording, which Wine support must not require. This sweep reads
-    /// OmniWM's own registry instead: floating windows owned by bundle-less
-    /// processes with near-fullscreen frames get their rules re-evaluated so
-    /// the wine adaptation (with its per-attribute facts fallback and
-    /// WindowServer resolver) can pull them into the tiling strip.
+    /// window) expires before facts are fetchable. CGWindowList needs Screen
+    /// Recording (which wine support must not require), and rescan enumeration
+    /// deadlines are too tight for busy games — so this sweep goes straight to
+    /// the sources it can trust: OmniWM's own registry for floating windows
+    /// misfiled before the classifier could see their facts, and a direct,
+    /// generously-timed AX probe of bundle-less processes for windows that
+    /// never got tracked at all.
     func startWineAdmissionSweep() {
         guard wineAdmissionSweepTask == nil else { return }
         wineAdmissionSweepTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
-                let misfiled = self.workspaceManager.allEntries().filter { entry in
-                    guard entry.mode == .floating,
-                          self.appInfoCache.info(for: entry.pid)?.bundleId == nil,
-                          let frame = entry.managedReplacementMetadata?.frame
-                              ?? entry.floatingState.map(\.lastFrame)
-                    else { return false }
-                    return self.workspaceManager.monitors.contains { monitor in
-                        frame.width >= monitor.frame.width * 0.85
-                            && frame.height >= monitor.visibleFrame.height * 0.8
-                    }
-                }
-                let actionable = misfiled.filter {
-                    (self.wineSweepRescanAttemptsByPid[$0.pid] ?? 0) < 8
-                }
-                guard !actionable.isEmpty else { continue }
-                for entry in actionable {
-                    self.wineSweepRescanAttemptsByPid[entry.pid, default: 0] += 1
-                }
-                if self.wineSweepRescanAttemptsByPid.count > 40 {
-                    self.wineSweepRescanAttemptsByPid = self.wineSweepRescanAttemptsByPid
-                        .filter { $0.value < 8 }
-                }
-                let sample = actionable.prefix(3)
-                    .map { "pid=\($0.pid)win=\($0.windowId)" }
-                    .joined(separator: " ")
-                Log.diagnostics.error(
-                    "wine sweep: re-evaluating misfiled floating windows [\(sample)]"
-                )
-                await self.reevaluateWindowRules(
-                    for: Set(actionable.map { WindowRuleReevaluationTarget.window($0.token) })
-                )
+
+                let misfiled = await self.wineSweepReevaluateMisfiledFloating()
+                let probed = await self.wineSweepProbeUntracked()
+                guard misfiled || probed else { continue }
             }
+        }
+    }
+
+    private func wineSweepReevaluateMisfiledFloating() async -> Bool {
+        let misfiled = workspaceManager.allEntries().filter { entry in
+            guard entry.mode == .floating,
+                  appInfoCache.info(for: entry.pid)?.bundleId == nil,
+                  let frame = entry.managedReplacementMetadata?.frame
+                      ?? entry.floatingState.map(\.lastFrame)
+            else { return false }
+            return workspaceManager.monitors.contains { monitor in
+                frame.width >= monitor.frame.width * 0.85
+                    && frame.height >= monitor.visibleFrame.height * 0.8
+            }
+        }
+        let actionable = misfiled.filter {
+            (wineSweepRescanAttemptsByPid[$0.pid] ?? 0) < 8
+        }
+        guard !actionable.isEmpty else { return false }
+        for entry in actionable {
+            wineSweepRescanAttemptsByPid[entry.pid, default: 0] += 1
+        }
+        pruneWineSweepAttempts()
+        let sample = actionable.prefix(3)
+            .map { "pid=\($0.pid)win=\($0.windowId)" }
+            .joined(separator: " ")
+        Log.diagnostics.error(
+            "wine sweep: re-evaluating misfiled floating windows [\(sample)]"
+        )
+        await reevaluateWindowRules(
+            for: Set(actionable.map { WindowRuleReevaluationTarget.window($0.token) })
+        )
+        return true
+    }
+
+    private func wineSweepProbeUntracked() async -> Bool {
+        let probedPids = NSWorkspace.shared.runningApplications
+            .filter {
+                $0.activationPolicy == .regular
+                    && $0.bundleIdentifier == nil
+                    && (wineSweepRescanAttemptsByPid[$0.processIdentifier] ?? 0) < 8
+            }
+            .map(\.processIdentifier)
+        guard !probedPids.isEmpty else { return false }
+
+        // AX queries against busy game processes can block for their full
+        // messaging timeout — never run them on the main actor.
+        let discovered: [(pid: pid_t, windowId: UInt32)] = await Task.detached(priority: .utility) {
+            probedPids.compactMap { pid -> (pid_t, UInt32)? in
+                let axApp = AXUIElementCreateApplication(pid)
+                AXUIElementSetMessagingTimeout(axApp, 2.0)
+                var windowsValue: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(
+                    axApp,
+                    kAXWindowsAttribute as CFString,
+                    &windowsValue
+                ) == .success,
+                    let windows = windowsValue as? [AXUIElement]
+                else { return nil }
+                for element in windows {
+                    var windowId: CGWindowID = 0
+                    guard _AXUIElementGetWindow(element, &windowId) == .success else { continue }
+                    return (pid, UInt32(windowId))
+                }
+                return nil
+            }
+        }.value
+
+        var acted = false
+        for candidate in discovered {
+            guard workspaceManager.entry(forWindowId: Int(candidate.windowId)) == nil else { continue }
+            wineSweepRescanAttemptsByPid[candidate.pid, default: 0] += 1
+            pruneWineSweepAttempts()
+            Log.diagnostics.error(
+                "wine sweep: untracked window win=\(candidate.windowId) pid=\(candidate.pid) -> create admission"
+            )
+            axEventHandler.processCreatedWindow(
+                windowId: candidate.windowId,
+                placementOrigin: .liveCreate,
+                retryTrigger: .create
+            )
+            acted = true
+        }
+        return acted
+    }
+
+    private func pruneWineSweepAttempts() {
+        if wineSweepRescanAttemptsByPid.count > 40 {
+            wineSweepRescanAttemptsByPid = wineSweepRescanAttemptsByPid
+                .filter { $0.value < 8 }
         }
     }
 
