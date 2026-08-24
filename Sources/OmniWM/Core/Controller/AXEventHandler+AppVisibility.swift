@@ -6,8 +6,21 @@ import Foundation
 @MainActor
 extension AXEventHandler {
     func handleWindowMiniaturized(pid: pid_t, windowId: Int) {
-        controller?.workspaceManager.clearNonManagedFocusTarget(
-            matching: WindowToken(pid: pid, windowId: windowId)
+        guard let controller else { return }
+        let token = WindowToken(pid: pid, windowId: windowId)
+        controller.workspaceManager.clearNonManagedFocusTarget(matching: token)
+        // A Dock-minimized window must leave the tiling strip so siblings
+        // reclaim its space and focus traversal no longer restores it from
+        // the Dock; un-minimizing re-admits it through app activation.
+        guard let entry = controller.workspaceManager.entry(for: token),
+              entry.mode == .tiling
+        else { return }
+        retireManagedWindow(
+            entry,
+            reason: .destroyed(
+                shouldRecoverFocus: controller.workspaceManager.focusedToken == token,
+                allowsPreferredRecoveryToken: false
+            )
         )
     }
 

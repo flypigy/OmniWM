@@ -132,6 +132,8 @@ final class WMController {
     @ObservationIgnored
     private var wineAdmissionSweepTask: Task<Void, Never>?
     @ObservationIgnored
+    private var wineSweepRescanAttemptsByPid: [pid_t: Int] = [:]
+    @ObservationIgnored
     private var floatDemotionFirstSamplesByToken: [WindowToken: ContinuousClock.Instant] = [:]
     private static let floatDemotionStabilityInterval: Duration = .milliseconds(300)
     private static let finderBundleId = "com.apple.finder"
@@ -903,27 +905,44 @@ final class WMController {
 
     /// Wine game surfaces often appear in the WindowServer minutes before their
     /// process can answer AX queries, so live create-admission (and its retry
-    /// window) expires before facts are fetchable. This sweep re-kicks
-    /// admission for visible, untracked, base-level parentless windows so such
-    /// windows eventually join the tiling strip instead of lingering below it.
+    /// window) expires before facts are fetchable. This sweep watches for
+    /// visible, untracked, base-level parentless windows and re-runs a
+    /// targeted rescan for their owning processes — the rescan enumeration
+    /// path reliably discovers windows the live create path misses.
     func startWineAdmissionSweep() {
         guard wineAdmissionSweepTask == nil else { return }
         wineAdmissionSweepTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
-                for info in SkyLight.shared.queryAllVisibleWindows()
-                where info.level == 0
-                    && info.parentId == 0
-                    && info.frame.width >= 480
-                    && info.frame.height >= 300
-                    && self.workspaceManager.entry(forWindowId: Int(info.id)) == nil
-                {
-                    self.axEventHandler.retryUntrackedWineWindowAdmission(
-                        windowId: info.id,
-                        serverInfo: info
-                    )
+                let untracked = SkyLight.shared.queryAllVisibleWindows().filter {
+                    $0.level == 0
+                        && $0.parentId == 0
+                        && $0.frame.width >= 480
+                        && $0.frame.height >= 300
+                        && self.workspaceManager.entry(forWindowId: Int($0.id)) == nil
                 }
+                guard !untracked.isEmpty else { continue }
+                let pids = Set(untracked.map { pid_t($0.pid) })
+                    .filter { (self.wineSweepRescanAttemptsByPid[$0] ?? 0) < 8 }
+                guard !pids.isEmpty else { continue }
+                for pid in pids {
+                    self.wineSweepRescanAttemptsByPid[pid, default: 0] += 1
+                }
+                if self.wineSweepRescanAttemptsByPid.count > 40 {
+                    self.wineSweepRescanAttemptsByPid = self.wineSweepRescanAttemptsByPid
+                        .filter { $0.value < 8 }
+                }
+                let sample = untracked.prefix(3)
+                    .map { "win=\($0.id)pid=\($0.pid)\($0.frame.width)x\($0.frame.height)" }
+                    .joined(separator: " ")
+                Log.layout.notice(
+                    "wine sweep: untracked wine-like windows [\(sample)] -> targeted rescan pids=\(pids.sorted())"
+                )
+                self.layoutRefreshController.requestFullRescan(
+                    reason: .appLaunched,
+                    scope: .targeted(appPIDs: pids, nativeSpaceIds: [])
+                )
             }
         }
     }

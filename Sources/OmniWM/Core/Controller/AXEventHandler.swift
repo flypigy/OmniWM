@@ -977,11 +977,33 @@ final class AXEventHandler {
             retryUntrackedWineWindowAdmission(windowId: windowId, serverInfo: nil)
         }
         if let trackedEntry = controller.workspaceManager.entry(forWindowId: Int(windowId)),
-           trackedEntry.mode == .tiling,
-           controller.mouseEventHandler.handleNativeTitleBarDragFrameChanged(for: trackedEntry)
-               || controller.niriLayoutHandler.hasScrollAnimation(for: trackedEntry.workspaceId)
+           trackedEntry.mode == .tiling
         {
-            return
+            // Native edge-drag on a tiled window: adopt the externally
+            // resized width into the column before the drag/animation
+            // early-returns below can drop the event, so the release width
+            // sticks (PaperWM-style) instead of snapping back. Skipped while
+            // our own gestures/animations are in flight and for frames that
+            // merely echo the last frame OmniWM applied.
+            if !controller.isInteractiveGestureActive,
+               !controller.niriLayoutHandler.hasScrollAnimation(for: trackedEntry.workspaceId),
+               let observed = observedFrame(for: trackedEntry)
+            {
+                let lastApplied = controller.axManager.lastAppliedFrame(for: trackedEntry.windowId)
+                if lastApplied == nil || abs(observed.width - lastApplied.width) > 1,
+                   controller.niriLayoutHandler.adoptNativeColumnWidthIfPlausible(
+                       token: trackedEntry.token,
+                       observedWidth: observed.width
+                   )
+                {
+                    return
+                }
+            }
+            if controller.mouseEventHandler.handleNativeTitleBarDragFrameChanged(for: trackedEntry)
+                || controller.niriLayoutHandler.hasScrollAnimation(for: trackedEntry.workspaceId)
+            {
+                return
+            }
         }
         let windowServerToken = resolveWindowToken(windowId)
         let resolvedToken = resolveTrackedToken(
@@ -1031,17 +1053,6 @@ final class AXEventHandler {
            shouldSuppressFrameChangedRelayout(
                for: entry,
                observedFrame: suppressionObservedFrame
-           )
-        {
-            return
-        }
-
-        // Native edge-drag on a tiled window: adopt the new width into the
-        // column (PaperWM-style) instead of snapping the window back.
-        if let observed = focusedObservedFrame ?? suppressionObservedFrame ?? observedFrame(for: entry),
-           controller.niriLayoutHandler.adoptNativeColumnWidthIfPlausible(
-               token: token,
-               observedWidth: observed.width
            )
         {
             return
