@@ -990,7 +990,8 @@ final class AXEventHandler {
                let observed = observedFrame(for: trackedEntry)
             {
                 let lastApplied = controller.axManager.lastAppliedFrame(for: trackedEntry.windowId)
-                if lastApplied == nil || abs(observed.width - lastApplied.width) > 1,
+                let frameIsExternalEcho = lastApplied.map { abs(observed.width - $0.width) > 1 } ?? true
+                if frameIsExternalEcho,
                    controller.niriLayoutHandler.adoptNativeColumnWidthIfPlausible(
                        token: trackedEntry.token,
                        observedWidth: observed.width
