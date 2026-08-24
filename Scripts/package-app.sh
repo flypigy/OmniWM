@@ -16,6 +16,10 @@ echo "Running release checks..."
 make -C "$ROOT_DIR" release-check
 
 echo "Building OmniWM arm64 binary ($CONFIG)..."
+# Runner VMs can retain a stale .build from a previous repository run; the
+# incremental state then skips compiling changed files and ships a stale
+# binary under a fresh git hash. Force a clean release-triple build.
+rm -rf "$ROOT_DIR/.build/arm64-apple-macosx"
 swift build "${SWIFT_BUILD_ARGS[@]}"
 BUILD_DIR="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
 EXECUTABLE="$BUILD_DIR/OmniWM"
