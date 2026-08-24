@@ -1584,6 +1584,17 @@ final class WMController {
         return nil
     }
 
+    /// Wine borderless game windows tile as a full-width column but must be
+    /// drawn over the whole screen (menu bar included) like they did under
+    /// the Hammerspoon setup — the working-area frame leaves the menu bar
+    /// visible over the game.
+    func wineFullscreenOverrideFrame(for entry: WindowState, frame: CGRect) -> CGRect {
+        guard entry.admissionHints.wineStyleAdaptation,
+              let monitor = workspaceManager.monitor(for: entry.workspaceId)
+        else { return frame }
+        return monitor.frame
+    }
+
     func shouldDeferAdmission(
         evaluation: WindowDecisionEvaluation,
         axRef: AXWindowRef,
