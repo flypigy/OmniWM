@@ -905,80 +905,48 @@ final class WMController {
 
     /// Wine game surfaces often appear in the WindowServer minutes before their
     /// process can answer AX queries, so live create-admission (and its retry
-    /// window) expires before facts are fetchable. This sweep watches for
-    /// visible, untracked, base-level parentless windows and re-runs a
-    /// targeted rescan for their owning processes — the rescan enumeration
-    /// path reliably discovers windows the live create path misses.
+    /// window) expires before facts are fetchable; and CGWindowList needs
+    /// Screen Recording, which Wine support must not require. This sweep reads
+    /// OmniWM's own registry instead: floating windows owned by bundle-less
+    /// processes with near-fullscreen frames get their rules re-evaluated so
+    /// the wine adaptation (with its per-attribute facts fallback and
+    /// WindowServer resolver) can pull them into the tiling strip.
     func startWineAdmissionSweep() {
         guard wineAdmissionSweepTask == nil else { return }
         wineAdmissionSweepTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
-                // SkyLight's queryAllVisibleWindows applies a visibility-bit
-                // filter that excludes Wine surfaces, so enumerate through
-                // CGWindowList — which demonstrably sees them — and key on
-                // bundle-less owners: every Wine-bridged process lacks a
-                // bundle identifier.
-                guard let windowList = CGWindowListCopyWindowInfo(
-                    [.optionOnScreenOnly, .excludeDesktopElements],
-                    kCGNullWindowID
-                ) as? [[String: Any]] else { continue }
-                let wineCandidates: [(windowId: UInt32, pid: pid_t, frame: CGRect)] = windowList.compactMap { entry in
-                    guard let windowNumber = entry[kCGWindowNumber as String] as? Int,
-                          let pidNumber = entry[kCGWindowOwnerPID as String] as? Int,
-                          let layer = entry[kCGWindowLayer as String] as? Int,
-                          layer == 0,
-                          let bounds = entry[kCGWindowBounds as String] as? [String: Any],
-                          let width = bounds["Width"] as? Double,
-                          let height = bounds["Height"] as? Double,
-                          width >= 480,
-                          height >= 300,
-                          self.appInfoCache.info(for: pid_t(pidNumber))?.bundleId == nil
-                    else { return nil }
-                    let frame = CGRect(
-                        x: bounds["X"] as? Double ?? 0,
-                        y: bounds["Y"] as? Double ?? 0,
-                        width: width,
-                        height: height
-                    )
-                    return (UInt32(windowNumber), pid_t(pidNumber), frame)
-                }
-                guard !wineCandidates.isEmpty else { continue }
-                // Untracked wine surfaces and ones misfiled as floating both
-                // get re-decided by a targeted rescan.
-                let actionable = wineCandidates.filter { candidate in
-                    if let existing = self.workspaceManager.entry(forWindowId: Int(candidate.windowId)) {
-                        guard existing.mode == .floating,
-                              candidate.frame.width >= 1200
-                        else { return false }
-                        return self.workspaceManager.monitors.contains { monitor in
-                            candidate.frame.width >= monitor.frame.width * 0.85
-                                && candidate.frame.height >= monitor.visibleFrame.height * 0.8
-                        }
+                let misfiled = self.workspaceManager.entries.values.filter { entry in
+                    guard entry.mode == .floating,
+                          self.appInfoCache.info(for: entry.pid)?.bundleId == nil,
+                          let frame = entry.managedReplacementMetadata?.frame
+                              ?? entry.floatingState.map(\.lastFrame)
+                    else { return false }
+                    return self.workspaceManager.monitors.contains { monitor in
+                        frame.width >= monitor.frame.width * 0.85
+                            && frame.height >= monitor.visibleFrame.height * 0.8
                     }
-                    return true
+                }
+                let actionable = misfiled.filter {
+                    (self.wineSweepRescanAttemptsByPid[$0.pid] ?? 0) < 8
                 }
                 guard !actionable.isEmpty else { continue }
-                let pids = Set(actionable.map(\.pid))
-                    .filter { (self.wineSweepRescanAttemptsByPid[$0] ?? 0) < 8 }
-                guard !pids.isEmpty else { continue }
-                for pid in pids {
-                    self.wineSweepRescanAttemptsByPid[pid, default: 0] += 1
+                for entry in actionable {
+                    self.wineSweepRescanAttemptsByPid[entry.pid, default: 0] += 1
                 }
                 if self.wineSweepRescanAttemptsByPid.count > 40 {
                     self.wineSweepRescanAttemptsByPid = self.wineSweepRescanAttemptsByPid
                         .filter { $0.value < 8 }
                 }
                 let sample = actionable.prefix(3)
-                    .map { "win=\($0.windowId)pid=\($0.pid)\($0.frame.width)x\($0.frame.height)" }
+                    .map { "pid=\($0.pid)win=\($0.windowId)" }
                     .joined(separator: " ")
                 Log.diagnostics.error(
-                    "wine sweep: wine-like windows [\(sample)] -> targeted rescan pids=\(pids.sorted())"
+                    "wine sweep: re-evaluating misfiled floating windows [\(sample)]"
                 )
-                self.layoutRefreshController.requestFullRescan(
-                    reason: .appLaunched,
-                    scope: .targeted(appPIDs: pids, nativeSpaceIds: [])
+                await self.reevaluateWindowRules(
+                    for: Set(actionable.map { WindowRuleReevaluationTarget.window($0.token) })
                 )
             }
         }
