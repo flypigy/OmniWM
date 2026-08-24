@@ -1590,9 +1590,14 @@ final class WMController {
         mode: TrackedWindowMode,
         windowInfo: WindowServerInfo?
     ) -> Bool {
+        // Wine-bridged windows report AXSize as not settable even though
+        // frame writes succeed; the wine adaptation must not be deferred
+        // on that false negative.
+        let settabilityCheckWaived = evaluation.decision.admissionHints.wineStyleAdaptation
         if let admissionGeometry = evaluation.admissionGeometry {
             if mode == .tiling,
-               !admissionGeometry.isSizeSettable
+               !admissionGeometry.isSizeSettable,
+               !settabilityCheckWaived
             {
                 return true
             }
@@ -1605,7 +1610,8 @@ final class WMController {
             return !Self.isMeaningfulAdmissionFrame(frame)
         }
         if mode == .tiling,
-           !AXWindowService.isSizeSettable(axRef)
+           !AXWindowService.isSizeSettable(axRef),
+           !settabilityCheckWaived
         {
             return true
         }
