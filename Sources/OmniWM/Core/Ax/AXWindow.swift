@@ -709,7 +709,7 @@ enum AXWindowService {
             }
         }
 
-        return makeWindowFacts(
+        let batchFacts = makeWindowFacts(
             AXWindowFactAttributeValues(
                 role: stringValue(attributeValue(.role)),
                 subrole: stringValue(attributeValue(.subrole)),
@@ -724,6 +724,20 @@ enum AXWindowService {
             bundleId: bundleId,
             attributeFetchSucceeded: attributeFetchSucceeded
         )
+
+        // Wine-bridged windows can answer the batched copy with per-item
+        // error values, leaving role/subrole nil even though individual
+        // attribute queries succeed; degrade to the single-attribute path
+        // so the wine classifier sees the real evidence.
+        if batchFacts.role == nil || batchFacts.subrole == nil {
+            return collectWindowFactsViaIndividualAttributes(
+                window,
+                appPolicy: appPolicy,
+                bundleId: bundleId,
+                includeTitle: includeTitle
+            ) ?? batchFacts
+        }
+        return batchFacts
     }
 
     /// Fallback for windows whose AX implementation rejects the batched
@@ -744,11 +758,11 @@ enum AXWindowService {
             return value
         }
 
-        guard let role = attribute(kAXRoleAttribute as CFString) as? String,
-              let subrole = attribute(kAXSubroleAttribute as CFString) as? String
+        guard let role = attribute(kAXRoleAttribute as CFString) as? String
         else {
             return nil
         }
+        let subrole = attribute(kAXSubroleAttribute as CFString) as? String
 
         let closeButton = attribute(kAXCloseButtonAttribute as CFString) != nil
         let fullscreenButton = attribute(kAXFullScreenButtonAttribute as CFString)

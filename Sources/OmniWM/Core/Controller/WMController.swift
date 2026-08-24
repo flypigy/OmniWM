@@ -922,8 +922,27 @@ final class WMController {
                         && $0.frame.height >= 300
                         && self.workspaceManager.entry(forWindowId: Int($0.id)) == nil
                 }
-                guard !untracked.isEmpty else { continue }
-                let pids = Set(untracked.map { pid_t($0.pid) })
+                // Wine windows that were admitted as floating before the
+                // classifier could see their facts: same WindowServer
+                // signature, bundle-less owner, near-fullscreen frame —
+                // a targeted rescan re-decides them into the tiling strip.
+                let misfiledFloating = SkyLight.shared.queryAllVisibleWindows().filter { info in
+                    guard info.level == 0,
+                          info.parentId == 0,
+                          let entry = self.workspaceManager.entry(forWindowId: Int(info.id)),
+                          entry.mode == .floating,
+                          self.appInfoCache.info(for: pid_t(info.pid))?.bundleId == nil
+                    else { return false }
+                    return self.workspaceManager.monitors.contains { monitor in
+                        monitor.frame.width > 0
+                            && monitor.visibleFrame.height > 0
+                            && info.frame.width >= monitor.frame.width * 0.85
+                            && info.frame.height >= monitor.visibleFrame.height * 0.8
+                    }
+                }
+                let wineInfos = untracked + misfiledFloating
+                guard !wineInfos.isEmpty else { continue }
+                let pids = Set(wineInfos.map { pid_t($0.pid) })
                     .filter { (self.wineSweepRescanAttemptsByPid[$0] ?? 0) < 8 }
                 guard !pids.isEmpty else { continue }
                 for pid in pids {
@@ -933,11 +952,11 @@ final class WMController {
                     self.wineSweepRescanAttemptsByPid = self.wineSweepRescanAttemptsByPid
                         .filter { $0.value < 8 }
                 }
-                let sample = untracked.prefix(3)
+                let sample = wineInfos.prefix(3)
                     .map { "win=\($0.id)pid=\($0.pid)\($0.frame.width)x\($0.frame.height)" }
                     .joined(separator: " ")
                 Log.layout.notice(
-                    "wine sweep: untracked wine-like windows [\(sample)] -> targeted rescan pids=\(pids.sorted())"
+                    "wine sweep: wine-like windows [\(sample)] -> targeted rescan pids=\(pids.sorted())"
                 )
                 self.layoutRefreshController.requestFullRescan(
                     reason: .appLaunched,
