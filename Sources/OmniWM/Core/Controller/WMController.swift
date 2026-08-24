@@ -915,34 +915,52 @@ final class WMController {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
-                let untracked = SkyLight.shared.queryAllVisibleWindows().filter {
-                    $0.level == 0
-                        && $0.parentId == 0
-                        && $0.frame.width >= 480
-                        && $0.frame.height >= 300
-                        && self.workspaceManager.entry(forWindowId: Int($0.id)) == nil
+                // SkyLight's queryAllVisibleWindows applies a visibility-bit
+                // filter that excludes Wine surfaces, so enumerate through
+                // CGWindowList — which demonstrably sees them — and key on
+                // bundle-less owners: every Wine-bridged process lacks a
+                // bundle identifier.
+                guard let windowList = CGWindowListCopyWindowInfo(
+                    [.optionOnScreenOnly, .excludeDesktopElements],
+                    kCGNullWindowID
+                ) as? [[String: Any]] else { continue }
+                let wineCandidates: [(windowId: UInt32, pid: pid_t, frame: CGRect)] = windowList.compactMap { entry in
+                    guard let windowNumber = entry[kCGWindowNumber as String] as? Int,
+                          let pidNumber = entry[kCGWindowOwnerPID as String] as? Int,
+                          let layer = entry[kCGWindowLayer as String] as? Int,
+                          layer == 0,
+                          let bounds = entry[kCGWindowBounds as String] as? [String: Any],
+                          let width = bounds["Width"] as? Double,
+                          let height = bounds["Height"] as? Double,
+                          width >= 480,
+                          height >= 300,
+                          self.appInfoCache.info(for: pid_t(pidNumber))?.bundleId == nil
+                    else { return nil }
+                    let frame = CGRect(
+                        x: bounds["X"] as? Double ?? 0,
+                        y: bounds["Y"] as? Double ?? 0,
+                        width: width,
+                        height: height
+                    )
+                    return (UInt32(windowNumber), pid_t(pidNumber), frame)
                 }
-                // Wine windows that were admitted as floating before the
-                // classifier could see their facts: same WindowServer
-                // signature, bundle-less owner, near-fullscreen frame —
-                // a targeted rescan re-decides them into the tiling strip.
-                let misfiledFloating = SkyLight.shared.queryAllVisibleWindows().filter { info in
-                    guard info.level == 0,
-                          info.parentId == 0,
-                          let entry = self.workspaceManager.entry(forWindowId: Int(info.id)),
-                          entry.mode == .floating,
-                          self.appInfoCache.info(for: pid_t(info.pid))?.bundleId == nil
-                    else { return false }
-                    return self.workspaceManager.monitors.contains { monitor in
-                        monitor.frame.width > 0
-                            && monitor.visibleFrame.height > 0
-                            && info.frame.width >= monitor.frame.width * 0.85
-                            && info.frame.height >= monitor.visibleFrame.height * 0.8
+                guard !wineCandidates.isEmpty else { continue }
+                // Untracked wine surfaces and ones misfiled as floating both
+                // get re-decided by a targeted rescan.
+                let actionable = wineCandidates.filter { candidate in
+                    if let existing = self.workspaceManager.entry(forWindowId: Int(candidate.windowId)) {
+                        guard existing.mode == .floating,
+                              candidate.frame.width >= 1200
+                        else { return false }
+                        return self.workspaceManager.monitors.contains { monitor in
+                            candidate.frame.width >= monitor.frame.width * 0.85
+                                && candidate.frame.height >= monitor.visibleFrame.height * 0.8
+                        }
                     }
+                    return true
                 }
-                let wineInfos = untracked + misfiledFloating
-                guard !wineInfos.isEmpty else { continue }
-                let pids = Set(wineInfos.map { pid_t($0.pid) })
+                guard !actionable.isEmpty else { continue }
+                let pids = Set(actionable.map(\.pid))
                     .filter { (self.wineSweepRescanAttemptsByPid[$0] ?? 0) < 8 }
                 guard !pids.isEmpty else { continue }
                 for pid in pids {
@@ -952,8 +970,8 @@ final class WMController {
                     self.wineSweepRescanAttemptsByPid = self.wineSweepRescanAttemptsByPid
                         .filter { $0.value < 8 }
                 }
-                let sample = wineInfos.prefix(3)
-                    .map { "win=\($0.id)pid=\($0.pid)\($0.frame.width)x\($0.frame.height)" }
+                let sample = actionable.prefix(3)
+                    .map { "win=\($0.windowId)pid=\($0.pid)\($0.frame.width)x\($0.frame.height)" }
                     .joined(separator: " ")
                 Log.layout.notice(
                     "wine sweep: wine-like windows [\(sample)] -> targeted rescan pids=\(pids.sorted())"
