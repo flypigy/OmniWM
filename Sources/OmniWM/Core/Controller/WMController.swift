@@ -917,7 +917,7 @@ final class WMController {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
-                let misfiled = self.workspaceManager.entries.values.filter { entry in
+                let misfiled = self.workspaceManager.allEntries().filter { entry in
                     guard entry.mode == .floating,
                           self.appInfoCache.info(for: entry.pid)?.bundleId == nil,
                           let frame = entry.managedReplacementMetadata?.frame
