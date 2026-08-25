@@ -262,6 +262,12 @@ final class WMController {
         axManager.interactionPolicyForWindowId = { [workspaceManager] windowId in
             workspaceManager.entry(forWindowId: windowId)?.interactionPolicy ?? .full
         }
+        axManager.wineFrameExpander = { [weak self] windowId, frame in
+            guard let self,
+                  let entry = self.workspaceManager.entry(forWindowId: windowId)
+            else { return frame }
+            return self.wineFullscreenOverrideFrame(for: entry, frame: frame)
+        }
         intentLedger.seqProvider = { [eventIntake] in eventIntake.lastSeq }
         intentLedger.deadlineWheel = deadlineWheel
         focusPolicyEngine.intentLedger = intentLedger

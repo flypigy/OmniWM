@@ -239,6 +239,7 @@ final class AXManager {
     private var nextParkFrameRequestId: AXFrameRequestId = 1
 
     var interactionPolicyForWindowId: ((Int) -> WindowInteractionPolicy)?
+    var wineFrameExpander: ((Int, CGRect) -> CGRect)?
 
     init() {
         installWorkspaceObservers()
@@ -1962,7 +1963,19 @@ final class AXManager {
     ) {
         let writable = framesAllowedToWrite(frames)
         guard !writable.isEmpty else { return }
-        enqueueFrameApplications(writable, isRetry: false, verify: verify, terminalObserver: terminalObserver)
+        // Single choke point for every tiling frame write: expand wine-adapted
+        // windows to the full monitor height so scroll animations, admission
+        // placement, and relayouts all cover the menu bar consistently.
+        let expanded = wineFrameExpander.map { expander in
+            writable.map { target in
+                AXFrameApplicationTarget(
+                    pid: target.pid,
+                    window: target.window,
+                    frame: expander(target.windowId, target.frame)
+                )
+            }
+        } ?? writable
+        enqueueFrameApplications(expanded, isRetry: false, verify: verify, terminalObserver: terminalObserver)
     }
 
     func applyClosingFrames(_ frames: [AXClosingFrameTarget]) {
