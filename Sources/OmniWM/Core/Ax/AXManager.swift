@@ -240,6 +240,7 @@ final class AXManager {
 
     var interactionPolicyForWindowId: ((Int) -> WindowInteractionPolicy)?
     var wineFrameExpander: ((Int, CGRect) -> CGRect)?
+    private var wineElevatedWindowIds: Set<Int> = []
 
     init() {
         installWorkspaceObservers()
@@ -1967,11 +1968,19 @@ final class AXManager {
         // windows to the full monitor height so scroll animations, admission
         // placement, and relayouts all cover the menu bar consistently.
         let expanded = wineFrameExpander.map { expander in
-            writable.map { target in
-                AXFrameApplicationTarget(
+            writable.map { target -> AXFrameApplicationTarget in
+                let frame = expander(target.windowId, target.frame)
+                if frame != target.frame, !wineElevatedWindowIds.contains(target.windowId) {
+                    // First expanded write for this window: lift it above the
+                    // menu bar and Dock so the fullscreen frame actually
+                    // covers them (both are overlays above level-0 windows).
+                    wineElevatedWindowIds.insert(target.windowId)
+                    SkyLight.shared.setWindowLevel(windowId: UInt32(target.windowId), level: 25)
+                }
+                return AXFrameApplicationTarget(
                     pid: target.pid,
                     window: target.expectedWindow,
-                    frame: expander(target.windowId, target.frame)
+                    frame: frame
                 )
             }
         } ?? writable
