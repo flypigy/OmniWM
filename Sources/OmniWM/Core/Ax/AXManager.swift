@@ -1970,7 +1970,7 @@ final class AXManager {
             writable.map { target in
                 AXFrameApplicationTarget(
                     pid: target.pid,
-                    window: target.window,
+                    expectedWindow: target.expectedWindow,
                     frame: expander(target.windowId, target.frame)
                 )
             }
