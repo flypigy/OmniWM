@@ -925,10 +925,26 @@ final class WMController {
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
 
+                self.wineSweepMaintainElevation()
                 let misfiled = await self.wineSweepReevaluateMisfiledFloating()
                 let probed = await self.wineSweepProbeUntracked()
                 guard misfiled || probed else { continue }
             }
+        }
+    }
+
+    private func wineSweepMaintainElevation() {
+        // Wine-bridged games periodically re-assert their window level,
+        knocking themselves back under the menu bar; re-elevate any that
+        dropped.
+        for entry in workspaceManager.allEntries() where entry.admissionHints.wineStyleAdaptation {
+            guard let windowId = UInt32(exactly: entry.windowId) else { continue }
+            let info = SkyLight.shared.queryWindowInfo(windowId)
+            guard let info, info.level < 25 else { continue }
+            SkyLight.shared.setWindowLevel(windowId: windowId, level: 25)
+            Log.diagnostics.error(
+                "wine sweep: re-elevated win=\(entry.windowId) pid=\(entry.pid) from level=\(info.level)"
+            )
         }
     }
 

@@ -455,6 +455,15 @@ final class AXEventHandler {
             handleAppActivation(pid: pid, source: .cgsFrontAppChanged)
 
         case let .orderChanged(windowId):
+            if let entry = controller.workspaceManager.entry(forWindowId: Int(windowId)),
+               entry.admissionHints.wineStyleAdaptation,
+               let elevatedId = UInt32(exactly: windowId)
+            {
+                let info = SkyLight.shared.queryWindowInfo(elevatedId)
+                if let info, info.level < 25 {
+                    SkyLight.shared.setWindowLevel(windowId: elevatedId, level: 25)
+                }
+            }
             handleWindowOrderChanged(windowId: windowId)
 
         case let .titleChanged(windowId):
