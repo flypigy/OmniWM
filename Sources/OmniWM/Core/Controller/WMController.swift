@@ -942,9 +942,6 @@ final class WMController {
             let info = SkyLight.shared.queryWindowInfo(windowId)
             guard let info, info.level < 25 else { continue }
             SkyLight.shared.setWindowLevel(windowId: windowId, level: 25)
-            Log.diagnostics.error(
-                "wine sweep: re-elevated win=\(entry.windowId) pid=\(entry.pid) from level=\(info.level)"
-            )
         }
     }
 
@@ -968,12 +965,6 @@ final class WMController {
             wineSweepRescanAttemptsByPid[entry.pid, default: 0] += 1
         }
         pruneWineSweepAttempts()
-        let sample = actionable.prefix(3)
-            .map { "pid=\($0.pid)win=\($0.windowId)" }
-            .joined(separator: " ")
-        Log.diagnostics.error(
-            "wine sweep: re-evaluating misfiled floating windows [\(sample)]"
-        )
         await reevaluateWindowRules(
             for: Set(actionable.map { WindowRuleReevaluationTarget.window($0.token) })
         )
@@ -1027,9 +1018,6 @@ final class WMController {
             guard workspaceManager.entry(forWindowId: Int(hit.windowId)) == nil else { continue }
             wineSweepRescanAttemptsByPid[hit.pid, default: 0] += 1
             pruneWineSweepAttempts()
-            Log.diagnostics.error(
-                "wine sweep: untracked window win=\(hit.windowId) pid=\(hit.pid) -> create admission with axRef"
-            )
             axEventHandler.processCreatedWindow(
                 windowId: hit.windowId,
                 fallbackToken: WindowToken(pid: hit.pid, windowId: Int(hit.windowId)),
@@ -1813,15 +1801,6 @@ final class WMController {
         )
         let fullscreen = appFullscreen ?? AXWindowService.isFullscreen(axRef)
         let bundleId = baseFacts.ax.bundleId ?? appInfo?.bundleId
-        // Error-level so it persists: the facts Wine-bridged windows hand to
-        // the decision pipeline have been the hardest thing to observe.
-        if bundleId == nil {
-            Log.diagnostics.error(
-                "wine-create-facts pid=\(pid) win=\(axRef.windowId) role=\(baseFacts.ax.role ?? "nil")"
-                    + " subrole=\(baseFacts.ax.subrole ?? "nil") close=\(baseFacts.ax.hasCloseButton)"
-                    + " fetchOK=\(baseFacts.ax.attributeFetchSucceeded)"
-            )
-        }
         var lookupAttempted = windowServerLookupAttempted || windowInfo != nil
         var resolvedWindowInfo = Self.exactWindowServerInfo(windowInfo, for: token)
         if resolvedWindowInfo == nil,
@@ -1893,25 +1872,13 @@ final class WMController {
             bundleId: captured.bundleId ?? appInfo?.bundleId,
             attributeFetchSucceeded: captured.attributeFetchSucceeded
         )
-        let exactWindowServer = Self.exactWindowServerInfo(windowInfo, for: token)
-        // Error-level so it persists: the facts Wine-bridged windows hand to
-        // the decision pipeline have been the hardest thing to observe.
-        if appInfo?.bundleId == nil {
-            Log.diagnostics.error(
-                "wine-facts pid=\(token.pid) win=\(token.windowId) role=\(axFacts.role ?? "nil")"
-                    + " subrole=\(axFacts.subrole ?? "nil") close=\(axFacts.hasCloseButton)"
-                    + " fs=\(axFacts.hasFullscreenButton) zoom=\(axFacts.hasZoomButton)"
-                    + " min=\(axFacts.hasMinimizeButton) fetchOK=\(axFacts.attributeFetchSucceeded)"
-                    + " ws=\(exactWindowServer.map { "lvl=\($0.level),parent=\($0.parentId)" } ?? "nil")"
-            )
-        }
         return makeWindowDispositionEvaluation(
             token: token,
             facts: WindowRuleFacts(
                 appName: appInfo?.name,
                 ax: axFacts,
                 sizeConstraints: evidence.sizeConstraints,
-                windowServer: exactWindowServer
+                windowServer: Self.exactWindowServerInfo(windowInfo, for: token)
             ),
             appFullscreen: appFullscreen,
             applyingManualOverride: applyingManualOverride,

@@ -349,7 +349,6 @@ final class AXEventHandler {
     var pendingPostCreateLifecycleVerificationOwners: [WindowToken: UInt64] = [:]
     var nextPostCreateLifecycleVerificationOwner: UInt64 = 1
     var admissionRetryStateByWindowId: [UInt32: AdmissionRetryState] = [:]
-    private var untrackedWineAdmissionAttempts: [UInt32: (count: Int, lastAt: TimeInterval)] = [:]
     var nextAdmissionRetryGeneration: UInt64 = 1
     var nextAdmissionRetryExecutionOwner: UInt64 = 1
     private var nextActivationObservationGeneration: UInt64 = 1
@@ -938,53 +937,11 @@ final class AXEventHandler {
         _ = controller.intentLedger.confirm(id: open.id)
     }
 
-    /// Re-kicks create admission for untracked windows whose WindowServer
-    /// evidence matches the Wine game signature (base level, parentless,
-    /// sizable). Wine processes typically cannot answer AX queries for seconds
-    /// after their windows appear, outliving the standard create-retry window.
-    /// Throttled per window so rendering-heavy games do not flood admission.
-    func retryUntrackedWineWindowAdmission(windowId: UInt32, serverInfo: WindowServerInfo?) {
-        guard let controller else { return }
-        guard controller.workspaceManager.entry(forWindowId: Int(windowId)) == nil else { return }
-        let info = serverInfo ?? resolveWindowInfo(windowId)
-        guard let info,
-              info.level == 0,
-              info.parentId == 0,
-              info.frame.width >= 480,
-              info.frame.height >= 300
-        else { return }
-
-        let now = Date().timeIntervalSinceReferenceDate
-        if untrackedWineAdmissionAttempts.count > 64 {
-            untrackedWineAdmissionAttempts = untrackedWineAdmissionAttempts.filter {
-                now - $0.value.lastAt < 300
-            }
-        }
-        var attempt = untrackedWineAdmissionAttempts[windowId] ?? (count: 0, lastAt: 0)
-        guard attempt.count < 15, now - attempt.lastAt > 2.5 else { return }
-        attempt.count += 1
-        attempt.lastAt = now
-        untrackedWineAdmissionAttempts[windowId] = attempt
-
-        WindowAdmissionTrace.record(
-            .init(
-                action: .admissionRetryScheduled,
-                pid: pid_t(info.pid),
-                windowId: Int(windowId),
-                reason: "wine_sweep_attempt_\(attempt.count)",
-                outcome: "scheduled"
-            )
-        )
-        processCreatedWindow(windowId: windowId, placementOrigin: .liveCreate, retryTrigger: .create)
-    }
 
     private func handleFrameChanged(windowId: UInt32) {
         guard let controller else { return }
         guard !controller.isOwnedWindow(windowNumber: Int(windowId)) else { return }
         if retryAdmissionAfterFrameChangeRequiresEarlyReturn(windowId: windowId) { return }
-        if controller.workspaceManager.entry(forWindowId: Int(windowId)) == nil {
-            retryUntrackedWineWindowAdmission(windowId: windowId, serverInfo: nil)
-        }
         if let trackedEntry = controller.workspaceManager.entry(forWindowId: Int(windowId)),
            trackedEntry.mode == .tiling
         {

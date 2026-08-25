@@ -259,7 +259,7 @@ final class LayoutDiffExecutor {
                 let frameUpdate = AXFrameApplicationTarget(
                     pid: entry.pid,
                     window: entry.axRef,
-                    frame: controller.wineFullscreenOverrideFrame(for: entry, frame: change.frame)
+                    frame: change.frame
                 )
                 if change.allowsTerminalRecovery {
                     terminalRecoveryFrameUpdates.append(frameUpdate)
@@ -336,7 +336,7 @@ final class LayoutDiffExecutor {
             let frameUpdate = AXFrameApplicationTarget(
                 pid: entry.pid,
                 window: entry.axRef,
-                frame: controller.wineFullscreenOverrideFrame(for: entry, frame: change.frame)
+                frame: change.frame
             )
             if change.allowsTerminalRecovery {
                 terminalRecoveryFrameUpdates.append(frameUpdate)
