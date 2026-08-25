@@ -935,8 +935,8 @@ final class WMController {
 
     private func wineSweepMaintainElevation() {
         // Wine-bridged games periodically re-assert their window level,
-        knocking themselves back under the menu bar; re-elevate any that
-        dropped.
+        // knocking themselves back under the menu bar; re-elevate any that
+        // dropped.
         for entry in workspaceManager.allEntries() where entry.admissionHints.wineStyleAdaptation {
             guard let windowId = UInt32(exactly: entry.windowId) else { continue }
             let info = SkyLight.shared.queryWindowInfo(windowId)
