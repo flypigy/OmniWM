@@ -956,6 +956,13 @@ final class WMController {
             width: monitor.frame.width,
             height: monitor.frame.height
         )
+        // Only write when the geometry actually differs: repeated no-op AX
+        // writes fight the layout animations and make the window flicker
+        // while switching. The write re-fires exactly when the driver has
+        // reverted the fullscreen extents.
+        if let current, current.approximatelyEqual(to: target, tolerance: 1) {
+            return
+        }
         _ = AXWindowService.setFrame(
             entry.axRef,
             frame: target,
@@ -972,7 +979,9 @@ final class WMController {
         guard !flagged.isEmpty else { return }
         var workspaceIds = Set<WorkspaceDescriptor.ID>()
         for entry in flagged {
-            guard !AXWindowService.isMinimized(entry.axRef) else { continue }
+            guard !AXWindowService.isMinimized(entry.axRef),
+                  workspaceManager.canRestoreFromMinimize(entry.token)
+            else { continue }
             workspaceManager.setMinimized(false, for: entry.token)
             workspaceIds.insert(entry.workspaceId)
         }
@@ -3040,6 +3049,11 @@ extension WMController {
             guard !isFrontmostAppLockScreen() else { return }
         }
         if isManagedWindowSuppressedByMacOSHide(token) {
+            return
+        }
+        // Focusing a Dock-minimized window un-minimizes it; the flag clears
+        // on activation once the window is genuinely back.
+        if workspaceManager.isMinimized(for: token) {
             return
         }
         if isManagedWindowSuspendedForNativeFullscreen(token) {

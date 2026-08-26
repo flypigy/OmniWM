@@ -33,7 +33,8 @@ extension AXEventHandler {
         let restored = controller.workspaceManager.entries(forPid: pid).filter(\.isMinimized)
         guard !restored.isEmpty else { return }
         var workspaceIds = Set<WorkspaceDescriptor.ID>()
-        for entry in restored {
+        for entry in restored
+        where controller.workspaceManager.canRestoreFromMinimize(entry.token) {
             controller.workspaceManager.setMinimized(false, for: entry.token)
             workspaceIds.insert(entry.workspaceId)
         }
