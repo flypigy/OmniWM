@@ -734,7 +734,10 @@ import QuartzCore
         let entries = controller.workspaceManager.tiledEntries(in: workspaceId)
         let excludedTokens = Set(
             entries.lazy
-                .filter { controller.workspaceManager.isAppHidden(pid: $0.pid) }
+                .filter {
+                    controller.workspaceManager.isAppHidden(pid: $0.pid)
+                        || $0.isMinimized
+                }
                 .map(\.token)
         )
         let windows = buildWindowSnapshots(
@@ -1817,10 +1820,11 @@ import QuartzCore
         } else {
             for entry in trackedEntries
                 where controller.workspaceManager.isAppHidden(pid: entry.pid)
-                || (
-                    controller.workspaceManager.layoutReason(for: entry.token) == .nativeFullscreen
-                        && !nativeFullscreenRetirementKeys.contains(entry.token)
-                )
+                    || entry.isMinimized
+                    || (
+                        controller.workspaceManager.layoutReason(for: entry.token) == .nativeFullscreen
+                            && !nativeFullscreenRetirementKeys.contains(entry.token)
+                    )
             {
                 seenKeys.insert(.init(pid: entry.pid, windowId: entry.windowId))
             }

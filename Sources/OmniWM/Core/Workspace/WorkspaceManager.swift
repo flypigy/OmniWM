@@ -2415,6 +2415,14 @@ final class WorkspaceManager {
         world.isHiddenInCorner(token)
     }
 
+    func setMinimized(_ minimized: Bool, for token: WindowToken) {
+        world.setMinimized(minimized, for: token)
+    }
+
+    func isMinimized(for token: WindowToken) -> Bool {
+        world.isMinimized(for: token)
+    }
+
     func setHiddenState(_ state: HiddenState?, for token: WindowToken) {
         guard world.hiddenState(for: token) != state else { return }
         guard let workspaceId = workspace(for: token) else { return }

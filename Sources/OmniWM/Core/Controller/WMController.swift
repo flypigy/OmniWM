@@ -259,6 +259,9 @@ final class WMController {
         axManager.isWindowParked = { [workspaceManager] windowId in
             workspaceManager.entry(forWindowId: windowId)?.hiddenState != nil
         }
+        axManager.isWindowMinimized = { [workspaceManager] windowId in
+            workspaceManager.entry(forWindowId: windowId)?.isMinimized == true
+        }
         axManager.interactionPolicyForWindowId = { [workspaceManager] windowId in
             workspaceManager.entry(forWindowId: windowId)?.interactionPolicy ?? .full
         }
@@ -923,7 +926,9 @@ final class WMController {
         wineAdmissionSweepTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
-                guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
+                guard let self, self.hasStartedServices else { continue }
+                self.restoreMinimizedWindowsSweep()
+                guard self.settings.wineWindowAdaptation else { continue }
 
                 self.wineSweepMaintainElevation()
                 let misfiled = await self.wineSweepReevaluateMisfiledFloating()
@@ -933,11 +938,57 @@ final class WMController {
         }
     }
 
+    /// Wine-bridged games enter their borderless "fullscreen" mode — the one
+    /// that hides the menu bar and Dock — only when an exact screen-sized
+    /// geometry request arrives through the AX attribute channel; the driver
+    /// never sees SLS-level window moves (scroll animations). Re-issue one
+    /// direct AX frame write with the full-monitor extents, keeping the
+    /// column's current x so the strip position is unaffected.
+    func engageWineFullscreenFrame(for entry: WindowState) {
+        guard entry.admissionHints.wineStyleAdaptation,
+              let monitor = workspaceManager.monitor(for: entry.workspaceId)
+        else { return }
+        let current = AXWindowService.framePreferFast(entry.axRef)
+            ?? entry.managedReplacementMetadata?.frame
+        let target = CGRect(
+            x: current?.minX ?? 0,
+            y: monitor.frame.minY,
+            width: monitor.frame.width,
+            height: monitor.frame.height
+        )
+        _ = AXWindowService.setFrame(
+            entry.axRef,
+            frame: target,
+            currentFrameHint: current,
+            verify: false
+        )
+    }
+
+    /// Sweep fallback: front-app activation usually clears minimized flags
+    /// promptly; release any that are no longer miniaturized so the layout
+    /// reclaims their columns.
+    private func restoreMinimizedWindowsSweep() {
+        let flagged = workspaceManager.allEntries().filter { $0.isMinimized }
+        guard !flagged.isEmpty else { return }
+        var workspaceIds = Set<WorkspaceDescriptor.ID>()
+        for entry in flagged {
+            guard !AXWindowService.isMinimized(entry.axRef) else { continue }
+            workspaceManager.setMinimized(false, for: entry.token)
+            workspaceIds.insert(entry.workspaceId)
+        }
+        guard !workspaceIds.isEmpty else { return }
+        layoutRefreshController.requestRelayout(
+            reason: .axWindowChanged,
+            affectedWorkspaceIds: workspaceIds
+        )
+    }
+
     private func wineSweepMaintainElevation() {
         // Wine-bridged games periodically re-assert their window level,
         // knocking themselves back under the menu bar; re-elevate any that
         // dropped.
         for entry in workspaceManager.allEntries() where entry.admissionHints.wineStyleAdaptation {
+            engageWineFullscreenFrame(for: entry)
             guard let windowId = UInt32(exactly: entry.windowId) else { continue }
             let info = SkyLight.shared.queryWindowInfo(windowId)
             guard let info, info.level < 25 else { continue }

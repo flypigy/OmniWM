@@ -451,6 +451,7 @@ final class AXEventHandler {
                     )
                 )
             }
+            restoreMinimizedWindowsIfNeeded(pid: pid)
             handleAppActivation(pid: pid, source: .cgsFrontAppChanged)
 
         case let .orderChanged(windowId):
@@ -458,6 +459,7 @@ final class AXEventHandler {
                entry.admissionHints.wineStyleAdaptation,
                let elevatedId = UInt32(exactly: windowId)
             {
+                controller.engageWineFullscreenFrame(for: entry)
                 let info = SkyLight.shared.queryWindowInfo(elevatedId)
                 if let info, info.level < 25 {
                     SkyLight.shared.setWindowLevel(windowId: elevatedId, level: 25)

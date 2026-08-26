@@ -9,18 +9,37 @@ extension AXEventHandler {
         guard let controller else { return }
         let token = WindowToken(pid: pid, windowId: windowId)
         controller.workspaceManager.clearNonManagedFocusTarget(matching: token)
-        // A Dock-minimized window must leave the tiling strip so siblings
-        // reclaim its space and focus traversal no longer restores it from
-        // the Dock; un-minimizing re-admits it through app activation.
+        // Mark instead of retire: the entry and engine node stay alive while
+        // projection exclusion frees the strip space (like a cmd+H-hidden
+        // app), so un-minimizing returns the window to its exact column.
         guard let entry = controller.workspaceManager.entry(for: token),
-              entry.mode == .tiling
+              entry.mode == .tiling,
+              !entry.isMinimized
         else { return }
-        retireManagedWindow(
-            entry,
-            reason: .destroyed(
-                shouldRecoverFocus: controller.workspaceManager.focusedToken == token,
-                allowsPreferredRecoveryToken: false
-            )
+        controller.workspaceManager.setMinimized(true, for: token)
+        if controller.workspaceManager.focusedToken == token {
+            controller.workspaceManager.enterNonManagedFocus(preserveFocusedToken: false)
+        }
+        controller.layoutRefreshController.requestRelayout(
+            reason: .axWindowChanged,
+            affectedWorkspaceIds: [entry.workspaceId]
+        )
+    }
+
+    /// Dock-click activation brings minimized windows back; clear their flags
+    /// so the next layout restores their original strip positions.
+    func restoreMinimizedWindowsIfNeeded(pid: pid_t) {
+        guard let controller else { return }
+        let restored = controller.workspaceManager.entries(forPid: pid).filter(\.isMinimized)
+        guard !restored.isEmpty else { return }
+        var workspaceIds = Set<WorkspaceDescriptor.ID>()
+        for entry in restored {
+            controller.workspaceManager.setMinimized(false, for: entry.token)
+            workspaceIds.insert(entry.workspaceId)
+        }
+        controller.layoutRefreshController.requestRelayout(
+            reason: .axWindowChanged,
+            affectedWorkspaceIds: workspaceIds
         )
     }
 
