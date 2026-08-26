@@ -456,15 +456,10 @@ final class AXEventHandler {
 
         case let .orderChanged(windowId):
             if let entry = controller.workspaceManager.entry(forWindowId: Int(windowId)),
-               entry.admissionHints.wineStyleAdaptation,
-               let elevatedId = UInt32(exactly: windowId)
+               entry.admissionHints.wineStyleAdaptation
             {
                 controller.pressWineCenterMenuItem(for: entry)
                 controller.engageWineFullscreenFrame(for: entry)
-                let info = SkyLight.shared.queryWindowInfo(elevatedId)
-                if let info, info.level < 25 {
-                    SkyLight.shared.setWindowLevel(windowId: elevatedId, level: 25)
-                }
             }
             handleWindowOrderChanged(windowId: windowId)
 

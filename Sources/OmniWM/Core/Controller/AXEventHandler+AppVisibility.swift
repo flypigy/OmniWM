@@ -35,14 +35,25 @@ extension AXEventHandler {
         let restored = controller.workspaceManager.entries(forPid: pid).filter(\.isMinimized)
         guard !restored.isEmpty else { return }
         var workspaceIds = Set<WorkspaceDescriptor.ID>()
+        var restoredTokens = Set<WindowToken>()
         for entry in restored
         where controller.workspaceManager.canRestoreFromMinimize(entry.token) {
             controller.workspaceManager.setMinimized(false, for: entry.token)
             workspaceIds.insert(entry.workspaceId)
+            restoredTokens.insert(entry.token)
         }
-        controller.layoutRefreshController.requestVisibilityRefresh(
-            reason: .appUnhidden,
-            affectedWorkspaceIds: workspaceIds
+        guard !workspaceIds.isEmpty else { return }
+        controller.layoutRefreshController.requestImmediateRelayout(
+            reason: .axWindowChanged,
+            affectedWorkspaceIds: workspaceIds,
+            postLayout: { [weak controller] in
+                // Focusing the restored window moves the niri selection to
+                // its column, re-centering it per the user's settings.
+                guard let controller else { return }
+                for token in restoredTokens {
+                    controller.focusWindow(token)
+                }
+            }
         )
     }
 

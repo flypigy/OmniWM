@@ -930,7 +930,7 @@ final class WMController {
                 self.restoreMinimizedWindowsSweep()
                 guard self.settings.wineWindowAdaptation else { continue }
 
-                self.wineSweepMaintainElevation()
+                self.wineSweepMaintainEngagement()
                 let misfiled = await self.wineSweepReevaluateMisfiledFloating()
                 let probed = await self.wineSweepProbeUntracked()
                 guard misfiled || probed else { continue }
@@ -953,6 +953,12 @@ final class WMController {
     /// throttled so repeated orderChanged events do not hammer the menu.
     func pressWineCenterMenuItem(for entry: WindowState) {
         guard entry.admissionHints.wineStyleAdaptation else { return }
+        // Already in the driver's fullscreen mode: pressing Center again
+        // re-centers against the driver's own geometry and visibly fights
+        // the tiling frames.
+        if AXWindowService.isFullscreenAttributeSet(entry.axRef) {
+            return
+        }
         let now = Date()
         if let last = wineCenterPressAtByWindowId[entry.windowId],
            now.timeIntervalSince(last) < 2 {
@@ -1006,30 +1012,31 @@ final class WMController {
         let flagged = workspaceManager.allEntries().filter { $0.isMinimized }
         guard !flagged.isEmpty else { return }
         var workspaceIds = Set<WorkspaceDescriptor.ID>()
+        var restoredTokens = Set<WindowToken>()
         for entry in flagged {
             guard !AXWindowService.isMinimized(entry.axRef),
                   workspaceManager.canRestoreFromMinimize(entry.token)
             else { continue }
             workspaceManager.setMinimized(false, for: entry.token)
             workspaceIds.insert(entry.workspaceId)
+            restoredTokens.insert(entry.token)
         }
         guard !workspaceIds.isEmpty else { return }
-        layoutRefreshController.requestVisibilityRefresh(
-            reason: .appUnhidden,
-            affectedWorkspaceIds: workspaceIds
+        layoutRefreshController.requestImmediateRelayout(
+            reason: .axWindowChanged,
+            affectedWorkspaceIds: workspaceIds,
+            postLayout: { [weak self] in
+                guard let self else { return }
+                for token in restoredTokens {
+                    self.focusWindow(token)
+                }
+            }
         )
     }
 
-    private func wineSweepMaintainElevation() {
-        // Wine-bridged games periodically re-assert their window level,
-        // knocking themselves back under the menu bar; re-elevate any that
-        // dropped.
+    private func wineSweepMaintainEngagement() {
         for entry in workspaceManager.allEntries() where entry.admissionHints.wineStyleAdaptation {
             engageWineFullscreenFrame(for: entry)
-            guard let windowId = UInt32(exactly: entry.windowId) else { continue }
-            let info = SkyLight.shared.queryWindowInfo(windowId)
-            guard let info, info.level < 25 else { continue }
-            SkyLight.shared.setWindowLevel(windowId: windowId, level: 25)
         }
     }
 
