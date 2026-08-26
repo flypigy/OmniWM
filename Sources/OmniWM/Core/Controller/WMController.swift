@@ -959,9 +959,12 @@ final class WMController {
         if AXWindowService.isFullscreenAttributeSet(entry.axRef) {
             return
         }
+        // The driver's fullscreen mode sticks once engaged; repeated presses
+        // re-center against the driver's own geometry and fight the tiling
+        // frames (the vertical flicker on switch-back).
         let now = Date()
         if let last = wineCenterPressAtByWindowId[entry.windowId],
-           now.timeIntervalSince(last) < 2 {
+           now.timeIntervalSince(last) < 60 {
             return
         }
         wineCenterPressAtByWindowId[entry.windowId] = now
@@ -1022,13 +1025,25 @@ final class WMController {
             restoredTokens.insert(entry.token)
         }
         guard !workspaceIds.isEmpty else { return }
+        for token in restoredTokens {
+            guard let entry = workspaceManager.entry(for: token),
+                  let engine = niriEngine,
+                  let node = engine.findNode(for: token, in: entry.workspaceId)
+            else { continue }
+            workspaceManager.withNiriViewportState(for: entry.workspaceId) { state in
+                state.selectedNodeId = node.id
+            }
+        }
         layoutRefreshController.requestImmediateRelayout(
             reason: .axWindowChanged,
             affectedWorkspaceIds: workspaceIds,
             postLayout: { [weak self] in
                 guard let self else { return }
-                for token in restoredTokens {
-                    self.focusWindow(token)
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(800))
+                    for token in restoredTokens where self.workspaceManager.entry(for: token) != nil {
+                        self.focusWindow(token)
+                    }
                 }
             }
         )
