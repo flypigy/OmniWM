@@ -944,6 +944,34 @@ final class WMController {
     /// never sees SLS-level window moves (scroll animations). Re-issue one
     /// direct AX frame write with the full-monitor extents, keeping the
     /// column's current x so the strip position is unaffected.
+    @ObservationIgnored
+    private var wineCenterPressAtByWindowId: [Int: Date] = [:]
+
+    /// The wine driver's own Window→Center action engages its borderless
+    /// fullscreen mode instantly and reliably (external AX geometry writes
+    /// only work occasionally). Press the menu item programmatically,
+    /// throttled so repeated orderChanged events do not hammer the menu.
+    func pressWineCenterMenuItem(for entry: WindowState) {
+        guard entry.admissionHints.wineStyleAdaptation else { return }
+        let now = Date()
+        if let last = wineCenterPressAtByWindowId[entry.windowId],
+           now.timeIntervalSince(last) < 2 {
+            return
+        }
+        wineCenterPressAtByWindowId[entry.windowId] = now
+        if wineCenterPressAtByWindowId.count > 64 {
+            wineCenterPressAtByWindowId = wineCenterPressAtByWindowId.filter {
+                now.timeIntervalSince($0.value) < 60
+            }
+        }
+        let extractor = MenuExtractor()
+        guard let menuBar = extractor.getMenuBar(for: entry.pid),
+              let item = extractor.flattenMenuItems(from: menuBar)
+                  .first(where: { $0.title == "Center" && $0.parentTitles.contains("Window") })
+        else { return }
+        _ = performAXAction(item.axElement, "AXPress" as CFString, noteKey: "wineCenterPressFailed")
+    }
+
     func engageWineFullscreenFrame(for entry: WindowState) {
         guard entry.admissionHints.wineStyleAdaptation,
               let monitor = workspaceManager.monitor(for: entry.workspaceId)
@@ -986,8 +1014,8 @@ final class WMController {
             workspaceIds.insert(entry.workspaceId)
         }
         guard !workspaceIds.isEmpty else { return }
-        layoutRefreshController.requestRelayout(
-            reason: .axWindowChanged,
+        layoutRefreshController.requestVisibilityRefresh(
+            reason: .appUnhidden,
             affectedWorkspaceIds: workspaceIds
         )
     }

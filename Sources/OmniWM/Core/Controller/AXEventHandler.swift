@@ -459,6 +459,7 @@ final class AXEventHandler {
                entry.admissionHints.wineStyleAdaptation,
                let elevatedId = UInt32(exactly: windowId)
             {
+                controller.pressWineCenterMenuItem(for: entry)
                 controller.engageWineFullscreenFrame(for: entry)
                 let info = SkyLight.shared.queryWindowInfo(elevatedId)
                 if let info, info.level < 25 {

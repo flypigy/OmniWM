@@ -17,8 +17,10 @@ extension AXEventHandler {
               !entry.isMinimized
         else { return }
         controller.workspaceManager.setMinimized(true, for: token)
+        // Move the engine selection off the excluded column so scroll
+        // animations and traversal have a valid target.
         if controller.workspaceManager.focusedToken == token {
-            controller.workspaceManager.enterNonManagedFocus(preserveFocusedToken: false)
+            _ = controller.commandHandler.handleCommand(.focus(.left))
         }
         controller.layoutRefreshController.requestRelayout(
             reason: .axWindowChanged,
@@ -38,8 +40,8 @@ extension AXEventHandler {
             controller.workspaceManager.setMinimized(false, for: entry.token)
             workspaceIds.insert(entry.workspaceId)
         }
-        controller.layoutRefreshController.requestRelayout(
-            reason: .axWindowChanged,
+        controller.layoutRefreshController.requestVisibilityRefresh(
+            reason: .appUnhidden,
             affectedWorkspaceIds: workspaceIds
         )
     }
