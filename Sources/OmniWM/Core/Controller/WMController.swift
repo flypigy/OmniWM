@@ -968,7 +968,9 @@ final class WMController {
         else { return }
         wineCenterPressedWindowIds.insert(entry.windowId)
         if wineCenterPressedWindowIds.count > 64 {
-            wineCenterPressedWindowIds.removeFirst(wineCenterPressedWindowIds.count - 64)
+            wineCenterPressedWindowIds = Set(wineCenterPressedWindowIds.dropFirst(
+                wineCenterPressedWindowIds.count - 64
+            ))
         }
         _ = performAXAction(item.axElement, "AXPress" as CFString, noteKey: "wineCenterPressFailed")
     }
