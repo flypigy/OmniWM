@@ -940,7 +940,7 @@ final class WMController {
     /// direct AX frame write with the full-monitor extents, keeping the
     /// column's current x so the strip position is unaffected.
     @ObservationIgnored
-    private var wineCenterPressAtByWindowId: [Int: Date] = [:]
+    private var wineCenterPressedWindowIds: Set<Int> = []
 
     /// The wine driver's own Window→Center action engages its borderless
     /// fullscreen mode instantly and reliably (external AX geometry writes
@@ -954,25 +954,22 @@ final class WMController {
         if AXWindowService.isFullscreenAttributeSet(entry.axRef) {
             return
         }
-        // The driver's fullscreen mode sticks once engaged; repeated presses
-        // re-center against the driver's own geometry and fight the tiling
-        // frames (the vertical flicker on switch-back).
-        let now = Date()
-        if let last = wineCenterPressAtByWindowId[entry.windowId],
-           now.timeIntervalSince(last) < 60 {
+        // The driver's fullscreen mode sticks for the window's lifetime;
+        // any repeat press re-centers against the driver's own geometry and
+        // fights the tiling frames (the half-second vertical jitter when
+        // switching back after a while). Exactly once per window.
+        if wineCenterPressedWindowIds.contains(entry.windowId) {
             return
-        }
-        wineCenterPressAtByWindowId[entry.windowId] = now
-        if wineCenterPressAtByWindowId.count > 64 {
-            wineCenterPressAtByWindowId = wineCenterPressAtByWindowId.filter {
-                now.timeIntervalSince($0.value) < 60
-            }
         }
         let extractor = MenuExtractor()
         guard let menuBar = extractor.getMenuBar(for: entry.pid),
               let item = extractor.flattenMenuItems(from: menuBar)
                   .first(where: { $0.title == "Center" && $0.parentTitles.contains("Window") })
         else { return }
+        wineCenterPressedWindowIds.insert(entry.windowId)
+        if wineCenterPressedWindowIds.count > 64 {
+            wineCenterPressedWindowIds.removeFirst(wineCenterPressedWindowIds.count - 64)
+        }
         _ = performAXAction(item.axElement, "AXPress" as CFString, noteKey: "wineCenterPressFailed")
     }
 
