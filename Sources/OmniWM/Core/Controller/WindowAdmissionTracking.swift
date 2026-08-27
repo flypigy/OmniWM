@@ -77,9 +77,6 @@ extension AXEventHandler {
                 axRef: trackedEntry.axRef
             )
         )
-        if trackedEntry.admissionHints.wineStyleAdaptation {
-            controller.engageWineFullscreenFrame(for: trackedEntry)
-        }
 
         var floatingTargetFrame: CGRect?
         if trackedEntry.mode == .floating {

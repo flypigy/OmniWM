@@ -577,15 +577,6 @@ enum AXWindowService {
         return isSystemModalSurface(role: attributes.role, subrole: attributes.subrole)
     }
 
-    static func isMinimized(_ window: AXWindowRef) -> Bool {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(window.element, "AXMinimized" as CFString, &value) == .success,
-              let value,
-              let flag = value as? Bool
-        else { return true } // unreadable: assume still minimized
-        return flag
-    }
-
     static func isFullscreen(_ window: AXWindowRef) -> Bool {
         isFullscreen(window, subrole: subrole(window))
     }

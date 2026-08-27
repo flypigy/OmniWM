@@ -388,7 +388,7 @@ final class WorldStore {
         for workspaceId in workspaceIds {
             let tiledEntries = model.windows(in: workspaceId).filter { $0.mode == .tiling }
             let excludedTokens = Set(tiledEntries.lazy.filter {
-                self.hiddenAppPIDs.contains($0.pid) || $0.isMinimized
+                self.hiddenAppPIDs.contains($0.pid)
             }.map(\.token))
             niriEngine?.setProjectionExclusions(excludedTokens, in: workspaceId)
         }
@@ -506,13 +506,6 @@ extension WorldStore {
         model.hiddenState(for: token)
     }
 
-    func setMinimized(_ minimized: Bool, for token: WindowToken) {
-        model.setMinimized(minimized, for: token)
-    }
-
-    func isMinimized(for token: WindowToken) -> Bool {
-        model.isMinimized(for: token)
-    }
 
     func isAppHidden(pid: pid_t) -> Bool {
         hiddenAppPIDs.contains(pid)

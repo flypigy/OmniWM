@@ -451,7 +451,6 @@ final class AXEventHandler {
                     )
                 )
             }
-            restoreMinimizedWindowsIfNeeded(pid: pid)
             handleAppActivation(pid: pid, source: .cgsFrontAppChanged)
 
         case let .orderChanged(windowId):

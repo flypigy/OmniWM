@@ -2415,28 +2415,6 @@ final class WorkspaceManager {
         world.isHiddenInCorner(token)
     }
 
-    private var minimizedAtByToken: [WindowToken: Date] = [:]
-
-    func setMinimized(_ minimized: Bool, for token: WindowToken) {
-        world.setMinimized(minimized, for: token)
-        if minimized {
-            minimizedAtByToken[token] = Date()
-        } else {
-            minimizedAtByToken.removeValue(forKey: token)
-        }
-    }
-
-    /// The AXMinimized attribute can lag the miniaturize notification; do
-    /// not treat a just-marked window as restored.
-    func canRestoreFromMinimize(_ token: WindowToken) -> Bool {
-        guard let marked = minimizedAtByToken[token] else { return true }
-        return Date().timeIntervalSince(marked) > 1.5
-    }
-
-    func isMinimized(for token: WindowToken) -> Bool {
-        world.isMinimized(for: token)
-    }
-
     func setHiddenState(_ state: HiddenState?, for token: WindowToken) {
         guard world.hiddenState(for: token) != state else { return }
         guard let workspaceId = workspace(for: token) else { return }

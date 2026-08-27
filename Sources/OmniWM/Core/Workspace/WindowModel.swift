@@ -504,14 +504,6 @@ final class WindowModel {
         entries[token]?.hiddenState = state
     }
 
-    func setMinimized(_ minimized: Bool, for token: WindowToken) {
-        entries[token]?.isMinimized = minimized
-    }
-
-    func isMinimized(for token: WindowToken) -> Bool {
-        entries[token]?.isMinimized ?? false
-    }
-
     func hiddenState(for token: WindowToken) -> HiddenState? {
         entries[token]?.hiddenState
     }

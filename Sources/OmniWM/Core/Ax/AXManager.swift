@@ -240,8 +240,6 @@ final class AXManager {
 
     var interactionPolicyForWindowId: ((Int) -> WindowInteractionPolicy)?
     var wineFrameExpander: ((Int, CGRect) -> CGRect)?
-    var isWindowMinimized: ((Int) -> Bool)?
-    private var wineElevatedWindowIds: Set<Int> = []
 
     init() {
         installWorkspaceObservers()
@@ -2003,21 +2001,21 @@ final class AXManager {
     private func framesAllowedToWrite(
         _ frames: [AXFrameApplicationTarget]
     ) -> [AXFrameApplicationTarget] {
-        func mayWriteFrame(_ target: AXFrameApplicationTarget) -> Bool {
-            !macOSHiddenAppPIDs.contains(target.pid)
-                && !(isWindowMinimized?(target.windowId) ?? false)
-                && !excludeFrameWriteForNativeTitleBarDrag(
-                    pid: target.pid,
-                    windowId: target.windowId
-                )
-        }
         if let interactionPolicyForWindowId {
             return frames.filter {
-                mayWriteFrame($0) && interactionPolicyForWindowId($0.windowId).mayWriteFrame
+                !macOSHiddenAppPIDs.contains($0.pid)
+                    && interactionPolicyForWindowId($0.windowId).mayWriteFrame
+                    && !excludeFrameWriteForNativeTitleBarDrag(
+                        pid: $0.pid,
+                        windowId: $0.windowId
+                    )
             }
         }
-        guard !macOSHiddenAppPIDs.isEmpty || nativeTitleBarDrag != nil || isWindowMinimized != nil else { return frames }
-        return frames.filter(mayWriteFrame)
+        guard !macOSHiddenAppPIDs.isEmpty || nativeTitleBarDrag != nil else { return frames }
+        return frames.filter {
+            !macOSHiddenAppPIDs.contains($0.pid)
+                && !excludeFrameWriteForNativeTitleBarDrag(pid: $0.pid, windowId: $0.windowId)
+        }
     }
 
     func excludeFrameWriteForNativeTitleBarDrag(pid: pid_t, windowId: Int) -> Bool {

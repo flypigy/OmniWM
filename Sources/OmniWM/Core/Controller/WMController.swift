@@ -259,9 +259,6 @@ final class WMController {
         axManager.isWindowParked = { [workspaceManager] windowId in
             workspaceManager.entry(forWindowId: windowId)?.hiddenState != nil
         }
-        axManager.isWindowMinimized = { [workspaceManager] windowId in
-            workspaceManager.entry(forWindowId: windowId)?.isMinimized == true
-        }
         axManager.interactionPolicyForWindowId = { [workspaceManager] windowId in
             workspaceManager.entry(forWindowId: windowId)?.interactionPolicy ?? .full
         }
@@ -926,9 +923,7 @@ final class WMController {
         wineAdmissionSweepTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
-                guard let self, self.hasStartedServices else { continue }
-                self.restoreMinimizedWindowsSweep()
-                guard self.settings.wineWindowAdaptation else { continue }
+                guard let self, self.hasStartedServices, self.settings.wineWindowAdaptation else { continue }
 
                 self.wineSweepMaintainEngagement()
                 let misfiled = await self.wineSweepReevaluateMisfiledFloating()
@@ -1005,47 +1000,6 @@ final class WMController {
             frame: target,
             currentFrameHint: current,
             verify: false
-        )
-    }
-
-    /// Sweep fallback: front-app activation usually clears minimized flags
-    /// promptly; release any that are no longer miniaturized so the layout
-    /// reclaims their columns.
-    private func restoreMinimizedWindowsSweep() {
-        let flagged = workspaceManager.allEntries().filter { $0.isMinimized }
-        guard !flagged.isEmpty else { return }
-        var workspaceIds = Set<WorkspaceDescriptor.ID>()
-        var restoredTokens = Set<WindowToken>()
-        for entry in flagged {
-            guard !AXWindowService.isMinimized(entry.axRef),
-                  workspaceManager.canRestoreFromMinimize(entry.token)
-            else { continue }
-            workspaceManager.setMinimized(false, for: entry.token)
-            workspaceIds.insert(entry.workspaceId)
-            restoredTokens.insert(entry.token)
-        }
-        guard !workspaceIds.isEmpty else { return }
-        for token in restoredTokens {
-            guard let entry = workspaceManager.entry(for: token),
-                  let engine = niriEngine,
-                  let node = engine.findNode(for: token, in: entry.workspaceId)
-            else { continue }
-            workspaceManager.withNiriViewportState(for: entry.workspaceId) { state in
-                state.selectedNodeId = node.id
-            }
-        }
-        layoutRefreshController.requestImmediateRelayout(
-            reason: .axWindowChanged,
-            affectedWorkspaceIds: workspaceIds,
-            postLayout: { [weak self] in
-                guard let self else { return }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(800))
-                    for token in restoredTokens where self.workspaceManager.entry(for: token) != nil {
-                        self.focusWindow(token)
-                    }
-                }
-            }
         )
     }
 
@@ -3099,11 +3053,6 @@ extension WMController {
             guard !isFrontmostAppLockScreen() else { return }
         }
         if isManagedWindowSuppressedByMacOSHide(token) {
-            return
-        }
-        // Focusing a Dock-minimized window un-minimizes it; the flag clears
-        // on activation once the window is genuinely back.
-        if workspaceManager.isMinimized(for: token) {
             return
         }
         if isManagedWindowSuspendedForNativeFullscreen(token) {

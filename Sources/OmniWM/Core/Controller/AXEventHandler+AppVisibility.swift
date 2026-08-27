@@ -9,68 +9,22 @@ extension AXEventHandler {
         guard let controller else { return }
         let token = WindowToken(pid: pid, windowId: windowId)
         controller.workspaceManager.clearNonManagedFocusTarget(matching: token)
-        // Mark instead of retire: the entry and engine node stay alive while
-        // projection exclusion frees the strip space (like a cmd+H-hidden
-        // app), so un-minimizing returns the window to its exact column.
+        // PaperWM semantics: retire on minimize (siblings reclaim the space,
+        // traversal never restores from the Dock); un-minimizing re-admits
+        // through app activation, and the engine inserts the new column
+        // after the currently selected one.
         guard let entry = controller.workspaceManager.entry(for: token),
-              entry.mode == .tiling,
-              !entry.isMinimized
+              entry.mode == .tiling
         else { return }
-        controller.workspaceManager.setMinimized(true, for: token)
-        // Move the engine selection off the excluded column so scroll
-        // animations and traversal have a valid target.
-        if controller.workspaceManager.focusedToken == token {
-            _ = controller.commandHandler.handleCommand(.focus(.left))
-        }
-        controller.layoutRefreshController.requestRelayout(
-            reason: .axWindowChanged,
-            affectedWorkspaceIds: [entry.workspaceId]
+        retireManagedWindow(
+            entry,
+            reason: .destroyed(
+                shouldRecoverFocus: controller.workspaceManager.focusedToken == token,
+                allowsPreferredRecoveryToken: false
+            )
         )
     }
 
-    /// Dock-click activation brings minimized windows back; clear their flags
-    /// so the next layout restores their original strip positions.
-    func restoreMinimizedWindowsIfNeeded(pid: pid_t) {
-        guard let controller else { return }
-        let restored = controller.workspaceManager.entries(forPid: pid).filter(\.isMinimized)
-        guard !restored.isEmpty else { return }
-        var workspaceIds = Set<WorkspaceDescriptor.ID>()
-        var restoredTokens = Set<WindowToken>()
-        for entry in restored
-        where controller.workspaceManager.canRestoreFromMinimize(entry.token) {
-            controller.workspaceManager.setMinimized(false, for: entry.token)
-            workspaceIds.insert(entry.workspaceId)
-            restoredTokens.insert(entry.token)
-        }
-        guard !workspaceIds.isEmpty else { return }
-        // Stage 1: un-exclude and move the niri selection to the restored
-        // column without AX-focusing it - the strip scrolls over, reserving
-        // the gap while the Dock un-minimize animation lands in it.
-        for token in restoredTokens {
-            guard let entry = controller.workspaceManager.entry(for: token),
-                  let engine = controller.niriEngine,
-                  let node = engine.findNode(for: token, in: entry.workspaceId)
-            else { continue }
-            controller.workspaceManager.withNiriViewportState(for: entry.workspaceId) { state in
-                state.selectedNodeId = node.id
-            }
-        }
-        controller.layoutRefreshController.requestImmediateRelayout(
-            reason: .axWindowChanged,
-            affectedWorkspaceIds: workspaceIds,
-            postLayout: { [weak controller] in
-                // Stage 2: once the genie animation has landed, focus for
-                // real - keyboard input, borders, and hover routing follow.
-                guard let controller else { return }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(800))
-                    for token in restoredTokens where controller.workspaceManager.entry(for: token) != nil {
-                        controller.focusWindow(token)
-                    }
-                }
-            }
-        )
-    }
 
     func handleAppDeactivated(pid: pid_t) {
         guard let controller else { return }

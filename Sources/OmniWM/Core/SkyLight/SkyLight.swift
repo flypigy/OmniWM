@@ -147,7 +147,6 @@ final class SkyLight {
     ) -> Unmanaged<CGContext>?
     private typealias SetWindowShapeFunc = @convention(c) (Int32, UInt32, Float, Float, CFTypeRef) -> CGError
     private typealias SetWindowResolutionFunc = @convention(c) (Int32, UInt32, Float) -> CGError
-    private typealias SetWindowLevelFunc = @convention(c) (Int32, UInt32, Int32) -> CGError
     private typealias SetWindowOpacityFunc = @convention(c) (Int32, UInt32, Int32) -> CGError
     private typealias SetWindowBackgroundBlurRadiusFunc = @convention(c) (Int32, UInt32, Int32) -> CGError
     private typealias SetWindowTagsFunc = @convention(c) (Int32, UInt32, UnsafePointer<UInt64>, Int32) -> CGError
@@ -249,7 +248,6 @@ final class SkyLight {
     private let setWindowShape: SetWindowShapeFunc
     private let setWindowResolution: SetWindowResolutionFunc
     private let setWindowOpacity: SetWindowOpacityFunc
-    private let setWindowLevel: SetWindowLevelFunc?
     private let setWindowBackgroundBlurRadius: SetWindowBackgroundBlurRadiusFunc?
     private let setWindowTags: SetWindowTagsFunc
     private let setWindowProperty: SetWindowPropertyFunc?
@@ -359,7 +357,6 @@ final class SkyLight {
         setWindowShape = resolve("SLSSetWindowShape", as: SetWindowShapeFunc.self)
         setWindowResolution = resolve("SLSSetWindowResolution", as: SetWindowResolutionFunc.self)
         setWindowOpacity = resolve("SLSSetWindowOpacity", as: SetWindowOpacityFunc.self)
-        setWindowLevel = resolveOptional("SLSSetWindowLevel", as: SetWindowLevelFunc.self)
         setWindowBackgroundBlurRadius = resolveOptional(
             "SLSSetWindowBackgroundBlurRadius",
             as: SetWindowBackgroundBlurRadiusFunc.self
@@ -947,14 +944,6 @@ final class SkyLight {
             attributes: attributes,
             parentId: parentId
         )
-    }
-
-    /// Wine-adapted game windows sit above the menu bar and Dock (both are
-    /// overlays above level-0 windows) so the game reads as fullscreen.
-    func setWindowLevel(windowId: UInt32, level: Int32) {
-        let cid = getMainConnectionID()
-        guard cid != 0, let setWindowLevel else { return }
-        _ = setWindowLevel(cid, windowId, level)
     }
 
     func registerForNotification(

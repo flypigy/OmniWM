@@ -89,10 +89,6 @@ struct WindowState: Equatable {
     var interactionPolicy: WindowInteractionPolicy = .full
     var hiddenState: HiddenState?
     var layoutReason: LayoutReason = .standard
-    /// Dock-minimized: the entry and engine node stay alive but the window is
-    /// projection-excluded (like a cmd+H-hidden app) so un-minimizing returns
-    /// it to its exact strip position.
-    var isMinimized = false
 
     var pid: pid_t {
         token.pid
