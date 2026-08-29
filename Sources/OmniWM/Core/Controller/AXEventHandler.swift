@@ -2466,10 +2466,13 @@ final class AXEventHandler {
             // cached during that state carry the fullscreen geometry and
             // would pin the restored column at full width.
             controller.workspaceManager.clearCachedConstraints(for: entry.token)
-            // macOS's own exit-fullscreen animation drags the window back to
-            // the screen frame; with the ledger still holding the fullscreen
-            // convergence state that frame change reads as an echo and the
-            // relayout that would restore the column width is suppressed.
+            // macOS's exit-fullscreen animation drags the window toward the
+            // screen frame while our column-width write is verified; the
+            // refusal path then records the fullscreen width as the window's
+            // observed minimum, pinning every future layout at 100% width.
+            controller.workspaceManager.clearObservedMinSize(for: entry.token)
+            // The same animation makes the frame change read as an echo in
+            // the applied-frame ledger, suppressing the relayout entirely.
             controller.axManager.invalidateAppliedFrame(for: entry.windowId)
             controller.layoutRefreshController.markNativeFullscreenRestoredForFrameApply(entry.token)
         }

@@ -2620,6 +2620,10 @@ final class WorkspaceManager {
     }
 
     @discardableResult
+    func clearObservedMinSize(for token: WindowToken) {
+        world.clearObservedMinSize(for: token)
+    }
+
     func setObservedMinSize(_ size: CGSize, for token: WindowToken) -> Bool {
         world.setObservedMinSize(size, for: token)
     }
