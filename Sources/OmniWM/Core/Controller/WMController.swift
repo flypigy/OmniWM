@@ -884,6 +884,12 @@ final class WMController {
                   ?? appInfoCache.info(for: entry.pid)?.bundleId,
               !bundleId.isEmpty
         else { return }
+        // Never remember geometry observed during a native fullscreen
+        // transition - macOS drives the frame there, and its screen-sized
+        // frames would poison the app's remembered width with 1.0.
+        guard !workspaceManager.isNativeFullscreenSuspended(token),
+              workspaceManager.nativeFullscreenRecord(for: token) == nil
+        else { return }
 
         let workingFrame = insetWorkingFrame(for: monitor)
         let gaps = innerGap(for: monitor)
