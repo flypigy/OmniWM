@@ -569,6 +569,10 @@ final class WindowModel {
         observedMinSizeByToken[token]
     }
 
+    func clearObservedMinSize(for token: WindowToken) {
+        observedMinSizeByToken.removeValue(forKey: token)
+    }
+
     func setObservedMinSize(_ size: CGSize, for token: WindowToken) -> Bool {
         guard entries[token] != nil else { return false }
         if let existing = observedMinSizeByToken[token],
