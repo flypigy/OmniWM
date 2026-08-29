@@ -2462,6 +2462,10 @@ final class AXEventHandler {
         }
         let restored = controller.workspaceManager.restoreNativeFullscreenRecord(for: entry.token) || hadRecord
         if restored {
+            // Native fullscreen resized the window to the screen; constraints
+            // cached during that state carry the fullscreen geometry and
+            // would pin the restored column at full width.
+            controller.workspaceManager.clearCachedConstraints(for: entry.token)
             controller.layoutRefreshController.markNativeFullscreenRestoredForFrameApply(entry.token)
         }
         return restored

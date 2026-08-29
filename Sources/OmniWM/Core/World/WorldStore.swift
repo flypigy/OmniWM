@@ -936,6 +936,10 @@ extension WorldStore {
         }
     }
 
+    func clearCachedConstraints(for token: WindowToken) {
+        model.clearCachedConstraints(for: token)
+    }
+
     func setCachedConstraints(_ constraints: WindowSizeConstraints, for token: WindowToken) {
         model.setCachedConstraints(constraints, for: token)
     }

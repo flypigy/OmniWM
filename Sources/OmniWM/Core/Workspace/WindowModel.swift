@@ -553,6 +553,10 @@ final class WindowModel {
         return record.constraints
     }
 
+    func clearCachedConstraints(for token: WindowToken) {
+        constraintsCacheByToken.removeValue(forKey: token)
+    }
+
     func setCachedConstraints(_ constraints: WindowSizeConstraints, for token: WindowToken) {
         guard entries[token] != nil else { return }
         constraintsCacheByToken[token] = ConstraintsCacheRecord(

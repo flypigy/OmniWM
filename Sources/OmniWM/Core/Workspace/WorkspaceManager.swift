@@ -2605,6 +2605,10 @@ final class WorkspaceManager {
         world.cachedConstraints(for: token, maxAge: maxAge)
     }
 
+    func clearCachedConstraints(for token: WindowToken) {
+        world.clearCachedConstraints(for: token)
+    }
+
     func setCachedConstraints(_ constraints: WindowSizeConstraints, for token: WindowToken) {
         guard world.entry(for: token) != nil else { return }
         let normalized = constraints.normalized()
