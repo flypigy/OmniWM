@@ -11,11 +11,13 @@ enum OmniWMBrandMark {
                 return true
             }
             context.addPath(fit(glyph, into: rect.insetBy(dx: pointSize * 0.08, dy: pointSize * 0.06)))
-            context.setFillColor(NSColor.white.cgColor)
+            // Template rendering: macOS derives the color from the menu bar's
+            // appearance (wallpaper-dependent), so only the alpha matters.
+            context.setFillColor(NSColor.black.cgColor)
             context.fillPath()
             return true
         }
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 
