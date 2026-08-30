@@ -947,6 +947,8 @@ final class WMController {
     /// column's current x so the strip position is unaffected.
     @ObservationIgnored
     private var wineCenterPressedWindowIds: Set<Int> = []
+    @ObservationIgnored
+    private var wineCenterPressAttemptsByWindowId: [Int: Int] = [:]
 
     /// The wine driver's own Window→Center action engages its borderless
     /// fullscreen mode instantly and reliably (external AX geometry writes
@@ -963,22 +965,41 @@ final class WMController {
         // The driver's fullscreen mode sticks for the window's lifetime;
         // any repeat press re-centers against the driver's own geometry and
         // fights the tiling frames (the half-second vertical jitter when
-        // switching back after a while). Exactly once per window.
+        // switching back after a while). Exactly one successful press per
+        // window; a failed lookup (wine menus often defer instantiating
+        // their submenu items) leaves the window queued for retry.
         if wineCenterPressedWindowIds.contains(entry.windowId) {
             return
         }
-        let extractor = MenuExtractor()
-        guard let menuBar = extractor.getMenuBar(for: entry.pid),
-              let item = extractor.flattenMenuItems(from: menuBar)
-                  .first(where: { $0.title == "Center" && $0.parentTitles.contains("Window") })
-        else { return }
-        wineCenterPressedWindowIds.insert(entry.windowId)
-        if wineCenterPressedWindowIds.count > 64 {
-            wineCenterPressedWindowIds = Set(wineCenterPressedWindowIds.dropFirst(
-                wineCenterPressedWindowIds.count - 64
-            ))
+        let pid = entry.pid
+        let windowId = entry.windowId
+        let attempts = wineCenterPressAttemptsByWindowId[windowId] ?? 0
+        guard attempts < 6 else { return }
+        wineCenterPressAttemptsByWindowId[windowId] = attempts + 1
+        if wineCenterPressAttemptsByWindowId.count > 64 {
+            wineCenterPressAttemptsByWindowId = wineCenterPressAttemptsByWindowId
+                .filter { $0.value < 6 }
         }
-        _ = performAXAction(item.axElement, "AXPress" as CFString, noteKey: "wineCenterPressFailed")
+        // Wine game processes answer menu-tree queries extremely slowly or
+        // not at all; enumerating on the main actor would stall the app.
+        Task.detached(priority: .utility) { [weak self] in
+            let extractor = MenuExtractor()
+            guard let menuBar = extractor.getMenuBar(for: pid),
+                  let item = extractor.flattenMenuItems(from: menuBar)
+                      .first(where: { $0.title == "Center" && $0.parentTitles.contains("Window") })
+            else { return } // retried by a later sweep / orderChanged
+            let pressed = performAXAction(item.axElement, "AXPress" as CFString, noteKey: "wineCenterPressFailed")
+            guard let self else { return }
+            await MainActor.run {
+                guard pressed else { return }
+                self.wineCenterPressedWindowIds.insert(windowId)
+                if self.wineCenterPressedWindowIds.count > 64 {
+                    self.wineCenterPressedWindowIds = Set(self.wineCenterPressedWindowIds.dropFirst(
+                        self.wineCenterPressedWindowIds.count - 64
+                    ))
+                }
+            }
+        }
     }
 
     func engageWineFullscreenFrame(for entry: WindowState) {
@@ -1010,6 +1031,13 @@ final class WMController {
 
     private func wineSweepMaintainEngagement() {
         for entry in workspaceManager.allEntries() where entry.admissionHints.wineStyleAdaptation {
+            // Re-issue the Center press from the sweep too: windows whose
+            // create-time orderChanged events were missed (app launched
+            // before OmniWM, or before permissions were granted) otherwise
+            // never get pressed. The per-window attempt cap and pressed set
+            // keep the retry bounded, and the lookup itself retries until
+            // the wine app instantiates its Window menu items.
+            pressWineCenterMenuItem(for: entry)
             engageWineFullscreenFrame(for: entry)
         }
     }
