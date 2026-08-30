@@ -1836,22 +1836,36 @@ enum StructuralMutationOutcome: Equatable {
     /// resize of the focused window, leaving standard relayout handling intact.
     func adoptNativeColumnWidthIfPlausible(token: WindowToken, observedWidth: CGFloat) -> Bool {
         guard let controller, controller.workspaceManager.focusedToken == token else { return false }
-        // Native fullscreen transitions resize the window to the full screen
-        // (enter and exit animations both do); that geometry is macOS's, not
-        // a user edge-drag. Adopting it would pin the column at 100% width
-        // and poison the remembered width.
-        guard !controller.workspaceManager.isNativeFullscreenSuspended(token),
-              controller.workspaceManager.nativeFullscreenRecord(for: token) == nil
-        else { return false }
+        // Wine-adapted windows are exempt from the fullscreen-transition
+        // guards below: their driver keeps the window at full-screen extents
+        // and periodically re-asserts them via full-width frame changes —
+        // that feedback loop is what maintains its borderless fullscreen
+        // (and their columns are full-width by design, so adoption is
+        // harmless there).
+        let isWineAdapted = controller.workspaceManager.entry(for: token)?
+            .admissionHints.wineStyleAdaptation == true
+        if !isWineAdapted {
+            // Native fullscreen transitions resize the window to the full
+            // screen (enter and exit animations both do); that geometry is
+            // macOS's, not a user edge-drag. Adopting it would pin the
+            // column at 100% width and poison the remembered width.
+            guard !controller.workspaceManager.isNativeFullscreenSuspended(token),
+                  controller.workspaceManager.nativeFullscreenRecord(for: token) == nil
+            else { return false }
+        }
         var adoptedWorkspaceId: WorkspaceDescriptor.ID?
         withNiriWorkspaceContext { engine, wsId, _, _, _, workingFrame, gaps, orientation in
             guard orientation == .horizontal,
-                  let monitor = controller.workspaceManager.monitor(for: wsId),
-                  // A screen-sized frame is a fullscreen transition.
-                  observedWidth < monitor.frame.width - 16,
                   let windowNode = engine.findNode(for: token, in: wsId),
                   let column = engine.findColumn(containing: windowNode, in: wsId)
             else { return }
+            if !isWineAdapted,
+               let monitor = controller.workspaceManager.monitor(for: wsId),
+               // A screen-sized frame is a fullscreen transition.
+               observedWidth >= monitor.frame.width - 16
+            {
+                return
+            }
 
             let currentWidth = engine.cachedWidthForResizeStart(
                 column,
