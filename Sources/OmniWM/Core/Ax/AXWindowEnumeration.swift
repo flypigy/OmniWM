@@ -373,9 +373,7 @@ enum AXWindowEnumerationInspector {
 
         func looksDegraded() -> Bool {
             if (value(at: 0, in: values) as? String) == nil { return true }
-            let subrole = value(at: 1, in: values)
-            if subrole != nil && !(subrole is String) { return true }
-            if (subrole as? String) == nil { return true }
+            if (value(at: 1, in: values) as? String) == nil { return true }
             return [5, 6, 7, 8].contains { buttonSlotIsDegraded(value(at: $0, in: values)) }
         }
 
