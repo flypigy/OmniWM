@@ -984,24 +984,21 @@ final class WMController {
             wineCenterPressAttemptsByWindowId = wineCenterPressAttemptsByWindowId
                 .filter { $0.value < 6 }
         }
-        // Wine game processes answer menu-tree queries extremely slowly or
-        // not at all; enumerating on the main actor would stall the app.
-        Task.detached(priority: .utility) { [weak self] in
+        // MenuExtractor sets bounded AX messaging timeouts, so the lookup is
+        // slow but never hangs; it must run on the main actor.
+        Task { @MainActor [weak self] in
             let extractor = MenuExtractor()
             guard let menuBar = extractor.getMenuBar(for: pid),
                   let item = extractor.flattenMenuItems(from: menuBar)
                       .first(where: { $0.title == "Center" && $0.parentTitles.contains("Window") })
             else { return } // retried by a later sweep / orderChanged
             let pressed = performAXAction(item.axElement, "AXPress" as CFString, noteKey: "wineCenterPressFailed")
-            guard let self else { return }
-            await MainActor.run {
-                guard pressed else { return }
-                self.wineCenterPressedWindowIds.insert(windowId)
-                if self.wineCenterPressedWindowIds.count > 64 {
-                    self.wineCenterPressedWindowIds = Set(self.wineCenterPressedWindowIds.dropFirst(
-                        self.wineCenterPressedWindowIds.count - 64
-                    ))
-                }
+            guard pressed, let self else { return }
+            self.wineCenterPressedWindowIds.insert(windowId)
+            if self.wineCenterPressedWindowIds.count > 64 {
+                self.wineCenterPressedWindowIds = Set(self.wineCenterPressedWindowIds.dropFirst(
+                    self.wineCenterPressedWindowIds.count - 64
+                ))
             }
         }
     }
